@@ -12,6 +12,8 @@ int written_packets_count = 0;
 int largest_packet_size = 0;
 int largest_input_packet_size = 0;
 
+int should_skip_frame = 0;
+int skipped_frames = 0;
 static AVFormatContext *ifmt_ctx;
 static AVFormatContext *ofmt_ctx;
 
@@ -266,7 +268,7 @@ int main(int argc, char **argv)
         printf("couldn't open input file\n");
         exit(1);
     }
-    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/8_out.mp4");
+    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/odd_4_out.mp4");
     if(ret < 0){
         printf("couldn't open output file\n");
         exit(1);
@@ -302,8 +304,15 @@ int main(int argc, char **argv)
                         fprintf(stderr, "Error during decoding\n");
                         exit(1);
                     }
+
+                    printf("received_frames:%d ",received_frames);
+                    if(should_skip_frame++%2 == 0){
+                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
+                        av_frame_free(&frame);
+                        break;
+                    }
                     received_frames++;
-                    printf("#frames:%d \n", received_frames);
+                    printf("#frames:%d \n", received_frames-1);
                     ret = encode_write_frame(frame, stream_index);
                     av_frame_free(&frame);
                     if (ret < 0){
@@ -334,7 +343,9 @@ int main(int argc, char **argv)
         if (ret < 0)
             av_log(NULL, AV_LOG_ERROR, "Error occurred: %s\n", av_err2str(ret));
 
-    printf("Largest written_packet_size:%d largest read_packet_size:%d\n", largest_packet_size, largest_input_packet_size);
+    printf("Largest written_packet_size:%d largest read_packet_size:%d ,"
+                   "total_written_frames_count:%d total_skipped_frames:%d \n", largest_packet_size, largest_input_packet_size,
+           received_frames, skipped_frames);
     return ret ? 1 : 0;
 
 }
