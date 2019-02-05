@@ -1,23 +1,11 @@
-
-/**
- * Example for remuxing( changing file format ).
- *
- *
- *
- *
- */
-
 #include <algorithm>
-
 extern "C"{
 #include <libavformat/avformat.h>
 #include <libavutil/timestamp.h>
-#include <libavutil/opt.h>
 }
 
 #define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE), AV_ERROR_MAX_STRING_SIZE, errnum)
 #define av_ts2str(ts) av_ts_make_string((char*)__builtin_alloca(AV_TS_MAX_STRING_SIZE), ts)
-#define av_ts2timestr(ts, tb) av_ts_make_time_string((char*)__builtin_alloca(AV_TS_MAX_STRING_SIZE), ts, tb)
 
 int received_frames = 0;
 int written_packets_count = 0;
