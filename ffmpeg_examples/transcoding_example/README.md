@@ -1,2 +1,2 @@
 # Transcoding example:
--Simple transcoding example using ffmpeg.
+* Simple transcoding example using ffmpeg.
