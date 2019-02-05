@@ -7,6 +7,8 @@
  *
  */
 
+#include <algorithm>
+
 extern "C"{
 #include <libavformat/avformat.h>
 #include <libavutil/timestamp.h>
@@ -18,6 +20,9 @@ extern "C"{
 #define av_ts2timestr(ts, tb) av_ts_make_time_string((char*)__builtin_alloca(AV_TS_MAX_STRING_SIZE), ts, tb)
 
 int received_frames = 0;
+int written_packets_count = 0;
+int largest_packet_size = 0;
+int largest_input_packet_size = 0;
 
 static AVFormatContext *ifmt_ctx;
 static AVFormatContext *ofmt_ctx;
@@ -62,6 +67,7 @@ static int open_input_file(const char *filename)
             av_log(NULL, AV_LOG_ERROR, "Failed to allocate the decoder context for stream #%u\n", i);
             return AVERROR(ENOMEM);
         }
+
         ret = avcodec_parameters_to_context(codec_ctx, stream->codecpar);
         if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "Failed to copy decoder parameters to input decoder context "
@@ -72,9 +78,10 @@ static int open_input_file(const char *filename)
         if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO
             || codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
             if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
-                codec_ctx->framerate = av_guess_frame_rate(ifmt_ctx, stream, NULL);
+                codec_ctx->framerate = stream->r_frame_rate;
+
             /* Open decoder */
-            ret = avcodec_open2(codec_ctx, dec, NULL);
+            ret = avcodec_open2(codec_ctx,  dec, NULL);
             if (ret < 0) {
                 av_log(NULL, AV_LOG_ERROR, "Failed to open decoder for stream #%u\n", i);
                 return ret;
@@ -141,8 +148,14 @@ static int open_output_file(const char *filename)
                     enc_ctx->pix_fmt = encoder->pix_fmts[0];
                 else
                     enc_ctx->pix_fmt = dec_ctx->pix_fmt;
-                /* video time_base can be set to whatever is handy and supported by encoder */
-                enc_ctx->time_base = av_inv_q(dec_ctx->framerate);
+
+                /* Video time_base can be set to whatever is handy and supported by encoder
+                 * Remember fra
+                 *
+                 * */
+                enc_ctx->time_base = in_stream->time_base;
+
+
             } else {
                 enc_ctx->sample_rate = dec_ctx->sample_rate;
                 enc_ctx->channel_layout = dec_ctx->channel_layout;
@@ -156,7 +169,6 @@ static int open_output_file(const char *filename)
                 enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
 
-//            av_opt_set(enc_ctx->priv_data, "profile", "baseline", 0);
             /* Third parameter can be used to pass settings to encoder */
             ret = avcodec_open2(enc_ctx, encoder, NULL);
             if (ret < 0) {
@@ -181,7 +193,7 @@ static int open_output_file(const char *filename)
                 av_log(NULL, AV_LOG_ERROR, "Copying parameters for stream #%u failed\n", i);
                 return ret;
             }
-            out_stream->time_base = in_stream->time_base;
+            out_stream->time_base = dec_ctx->time_base;
         }
 
     }
@@ -240,7 +252,10 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
         printf("encoding:after adjust ts:%s\n", av_ts2str(enc_pkt.pts));
 
         av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
+        printf("Writing packet with size:%d  number:%d \n", enc_pkt.size, ++written_packets_count);
+        largest_packet_size = std::max(enc_pkt.size, largest_packet_size);
         ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
+        av_packet_unref(&enc_pkt);
         return ret;
 
 
@@ -258,12 +273,12 @@ int main(int argc, char **argv)
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/videoplayback.mp4");
+    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/4_out.mp4");
     if(ret < 0){
         printf("couldn't open input file\n");
         exit(1);
     }
-    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/4_out.mp4");
+    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/8_out.mp4");
     if(ret < 0){
         printf("couldn't open output file\n");
         exit(1);
@@ -283,6 +298,7 @@ int main(int argc, char **argv)
 //                             stream_ctx[stream_index].dec_ctx->time_base);
 
         if(type == AVMEDIA_TYPE_VIDEO){
+            largest_input_packet_size = std::max(largest_input_packet_size, packet->size);
             ret = avcodec_send_packet(stream_ctx[stream_index].dec_ctx, packet);
             if (ret < 0) {
                 av_frame_free(&frame);
@@ -301,7 +317,7 @@ int main(int argc, char **argv)
                     received_frames++;
                     printf("#frames:%d \n", received_frames);
                     ret = encode_write_frame(frame, stream_index);
-                    //av_frame_free(&frame);
+                    av_frame_free(&frame);
                     if (ret < 0){
                         printf("badddd\n");
                         exit(1);
@@ -330,6 +346,7 @@ int main(int argc, char **argv)
         if (ret < 0)
             av_log(NULL, AV_LOG_ERROR, "Error occurred: %s\n", av_err2str(ret));
 
+    printf("Largest written_packet_size:%d largest read_packet_size:%d\n", largest_packet_size, largest_input_packet_size);
     return ret ? 1 : 0;
 
 }
