@@ -68,7 +68,7 @@ static int open_input_file(const char *filename)
         if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO
             || codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
             if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
-                codec_ctx->framerate = stream->r_frame_rate;
+                codec_ctx->framerate = av_guess_frame_rate(ifmt_ctx, stream, NULL);
 
             /* Open decoder */
             ret = avcodec_open2(codec_ctx,  dec, NULL);
@@ -235,7 +235,7 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
 
         enc_pkt.stream_index = stream_index;
         printf("encoding:before adjust ts:%s\n", av_ts2str(enc_pkt.pts));
-
+//
 //        av_packet_rescale_ts(&enc_pkt,
 //                             stream_ctx[stream_index].enc_ctx->time_base,
 //                             ofmt_ctx->streams[stream_index]->time_base);
@@ -263,12 +263,12 @@ int main(int argc, char **argv)
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/4_out.mp4");
+    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/gotham_v_cut.mp4");
     if(ret < 0){
         printf("couldn't open input file\n");
         exit(1);
     }
-    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/odd_4_out.mp4");
+    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/gotham_v_cut_out.mp4");
     if(ret < 0){
         printf("couldn't open output file\n");
         exit(1);
@@ -278,14 +278,15 @@ int main(int argc, char **argv)
         frame = av_frame_alloc();
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
+        packet->duration = 0;
         stream_index = packet->stream_index;
         type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
         av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
                stream_index);
 
-//        av_packet_rescale_ts(packet,
-//                             ifmt_ctx->streams[stream_index]->time_base,
-//                             stream_ctx[stream_index].dec_ctx->time_base);
+        av_packet_rescale_ts(packet,
+                             ifmt_ctx->streams[stream_index]->time_base,
+                             stream_ctx[stream_index].dec_ctx->time_base);
 
         if(type == AVMEDIA_TYPE_VIDEO){
             largest_input_packet_size = std::max(largest_input_packet_size, packet->size);
