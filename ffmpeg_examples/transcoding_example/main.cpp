@@ -12,6 +12,8 @@ int written_packets_count = 0;
 int largest_packet_size = 0;
 int largest_input_packet_size = 0;
 
+int should_skip_frame = 0;
+int skipped_frames = 0;
 static AVFormatContext *ifmt_ctx;
 static AVFormatContext *ofmt_ctx;
 
@@ -66,7 +68,8 @@ static int open_input_file(const char *filename)
         if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO
             || codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
             if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
-                codec_ctx->framerate = stream->r_frame_rate;
+                codec_ctx->time_base =av_inv_q( av_guess_frame_rate(ifmt_ctx, stream, NULL));
+                printf("time base %d /%d \n",codec_ctx->time_base.num, codec_ctx->time_base.den);
 
             /* Open decoder */
             ret = avcodec_open2(codec_ctx,  dec, NULL);
@@ -141,7 +144,7 @@ static int open_output_file(const char *filename)
                  * Remember fra
                  *
                  * */
-                enc_ctx->time_base = in_stream->time_base;
+                enc_ctx->time_base = dec_ctx->time_base;
 
 
             } else {
@@ -234,9 +237,9 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
         enc_pkt.stream_index = stream_index;
         printf("encoding:before adjust ts:%s\n", av_ts2str(enc_pkt.pts));
 
-//        av_packet_rescale_ts(&enc_pkt,
-//                             stream_ctx[stream_index].enc_ctx->time_base,
-//                             ofmt_ctx->streams[stream_index]->time_base);
+        av_packet_rescale_ts(&enc_pkt,
+                             stream_ctx[stream_index].dec_ctx->time_base,
+                             ofmt_ctx->streams[stream_index]->time_base);
         printf("encoding:after adjust ts:%s\n", av_ts2str(enc_pkt.pts));
 
         av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
@@ -266,7 +269,7 @@ int main(int argc, char **argv)
         printf("couldn't open input file\n");
         exit(1);
     }
-    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/8_out.mp4");
+    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/4_out_even.mp4");
     if(ret < 0){
         printf("couldn't open output file\n");
         exit(1);
@@ -276,14 +279,15 @@ int main(int argc, char **argv)
         frame = av_frame_alloc();
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
+        packet->duration = 0;
         stream_index = packet->stream_index;
         type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
         av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
                stream_index);
 
-//        av_packet_rescale_ts(packet,
-//                             ifmt_ctx->streams[stream_index]->time_base,
-//                             stream_ctx[stream_index].dec_ctx->time_base);
+        av_packet_rescale_ts(packet,
+                             ifmt_ctx->streams[stream_index]->time_base,
+                             stream_ctx[stream_index].dec_ctx->time_base);
 
         if(type == AVMEDIA_TYPE_VIDEO){
             largest_input_packet_size = std::max(largest_input_packet_size, packet->size);
@@ -302,8 +306,15 @@ int main(int argc, char **argv)
                         fprintf(stderr, "Error during decoding\n");
                         exit(1);
                     }
+
+                    printf("received_frames:%d ",received_frames);
+                    if(should_skip_frame++%2 == 0){
+                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
+                        av_frame_free(&frame);
+                        break;
+                    }
                     received_frames++;
-                    printf("#frames:%d \n", received_frames);
+                    printf("#frames:%d \n", received_frames-1);
                     ret = encode_write_frame(frame, stream_index);
                     av_frame_free(&frame);
                     if (ret < 0){
@@ -334,7 +345,9 @@ int main(int argc, char **argv)
         if (ret < 0)
             av_log(NULL, AV_LOG_ERROR, "Error occurred: %s\n", av_err2str(ret));
 
-    printf("Largest written_packet_size:%d largest read_packet_size:%d\n", largest_packet_size, largest_input_packet_size);
+    printf("Largest written_packet_size:%d largest read_packet_size:%d ,"
+                   "total_written_frames_count:%d total_skipped_frames:%d \n", largest_packet_size, largest_input_packet_size,
+           received_frames, skipped_frames);
     return ret ? 1 : 0;
 
 }
