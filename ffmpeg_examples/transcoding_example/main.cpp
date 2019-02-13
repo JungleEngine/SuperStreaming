@@ -320,7 +320,7 @@ int main(int argc, char **argv)
                     }
 
                     printf("received_frames:%d ",received_frames);
-                    if(should_skip_frame++%2 == 1 && false){
+                    if(should_skip_frame++%2 == 1){
                         printf("Skipped_frame_number:%d \n", ++skipped_frames);
                         av_frame_free(&frame);
                         break;
