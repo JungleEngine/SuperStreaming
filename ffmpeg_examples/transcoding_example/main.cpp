@@ -2,6 +2,7 @@
 extern "C"{
 #include <libavformat/avformat.h>
 #include <libavutil/timestamp.h>
+#include <libavutil/opt.h>
 }
 
 #define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE), AV_ERROR_MAX_STRING_SIZE, errnum)
@@ -14,6 +15,9 @@ int largest_input_packet_size = 0;
 
 int should_skip_frame = 0;
 int skipped_frames = 0;
+int first_packet_size = 0;
+int first_packet_size_read = 0;
+
 static AVFormatContext *ifmt_ctx;
 static AVFormatContext *ofmt_ctx;
 
@@ -68,7 +72,8 @@ static int open_input_file(const char *filename)
         if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO
             || codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
             if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
-                codec_ctx->time_base =av_inv_q( av_guess_frame_rate(ifmt_ctx, stream, NULL));
+                codec_ctx->framerate = av_guess_frame_rate(ifmt_ctx, stream, NULL);
+
                 printf("time base %d /%d \n",codec_ctx->time_base.num, codec_ctx->time_base.den);
 
             /* Open decoder */
@@ -144,8 +149,10 @@ static int open_output_file(const char *filename)
                  * Remember fra
                  *
                  * */
-                enc_ctx->time_base = dec_ctx->time_base;
 
+                enc_ctx->time_base = in_stream->time_base;
+
+                av_opt_set( enc_ctx->priv_data, "preset", "veryslow", 0 );
 
             } else {
                 enc_ctx->sample_rate = dec_ctx->sample_rate;
@@ -198,6 +205,7 @@ static int open_output_file(const char *filename)
         }
     }
 
+
     /* init muxer, write output file header */
     ret = avformat_write_header(ofmt_ctx, NULL);
     if (ret < 0) {
@@ -215,7 +223,6 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
     int got_frame_local;
     AVPacket enc_pkt;
 
-    av_log(NULL, AV_LOG_INFO, "Encoding_frame_number:\n");
 
     /* encode filtered frame */
     enc_pkt.data = NULL;
@@ -245,6 +252,9 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
         av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
         printf("Writing packet with size:%d  number:%d \n", enc_pkt.size, ++written_packets_count);
         largest_packet_size = std::max(enc_pkt.size, largest_packet_size);
+        if(first_packet_size == 0){
+            first_packet_size = enc_pkt.size;
+        }
         ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
         av_packet_unref(&enc_pkt);
         return ret;
@@ -279,7 +289,9 @@ int main(int argc, char **argv)
         frame = av_frame_alloc();
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
-        packet->duration = 0;
+//        packet->duration = 0;
+        if(first_packet_size_read == 0)
+        first_packet_size_read = packet->size;
         stream_index = packet->stream_index;
         type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
         av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
@@ -308,7 +320,7 @@ int main(int argc, char **argv)
                     }
 
                     printf("received_frames:%d ",received_frames);
-                    if(should_skip_frame++%2 == 0){
+                    if(should_skip_frame++%2 == 1 && false){
                         printf("Skipped_frame_number:%d \n", ++skipped_frames);
                         av_frame_free(&frame);
                         break;
@@ -348,6 +360,8 @@ int main(int argc, char **argv)
     printf("Largest written_packet_size:%d largest read_packet_size:%d ,"
                    "total_written_frames_count:%d total_skipped_frames:%d \n", largest_packet_size, largest_input_packet_size,
            received_frames, skipped_frames);
+
+    printf(" First written_packet_size:%d  first_read_packet_size:%d\n", first_packet_size_read, first_packet_size);
     return ret ? 1 : 0;
 
 }
