@@ -152,7 +152,7 @@ static int open_output_file(const char *filename)
 
                 enc_ctx->time_base = in_stream->time_base;
 
-                av_opt_set( enc_ctx->priv_data, "preset", "veryslow", 0 );
+              //  av_opt_set( enc_ctx->priv_data, "preset", "veryslow", 0 );
 
             } else {
                 enc_ctx->sample_rate = dec_ctx->sample_rate;
