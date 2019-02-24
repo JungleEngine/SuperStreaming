@@ -219,109 +219,64 @@ static int open_input_file(const char *filename) {
 
 int audio_decode_frame(AVCodecContext * acodec_ctx, uint8_t *audio_buf, int buf_size) {
     static AVPacket pkt;
-    static uint8_t *audio_pkt_data = NULL;
-    static int audio_pkt_size = 0;
-    static AVFrame frame, *reframe;
-    int len1, data_size = 0, ret, dec_state;
-    for(;;) {
-        // 1 packet can contains multiple frames
-        while(audio_pkt_size>0) {
-            int got_frame = 0;
+    static AVFrame *frame, *reframe;
+    int data_size = 0, ret;
 
-            //TODO new API
-            // got_frame = avcodec_receive_frame(acodec_ctx, &frame);
-            // len1 = frame.linesize[0];
-            // end new  API
-//
-//            dec_state = avcodec_send_packet(acodec_ctx, &pkt);
-//            if (dec_state < 0) {
-//                av_log(NULL, AV_LOG_ERROR, "Decoding failed\n");
-//                /* if error, skip frame */
-//                audio_pkt_size = 0;
-//                break;
-//            }else {
-//
-//
-//                got_frame = avcodec_receive_frame(acodec_ctx, &frame);
-//                if (got_frame == AVERROR(EAGAIN) || got_frame == AVERROR_EOF){
-//                    printf("not enough:%s \n", av_err2str(got_frame));
-//                    got_frame = 0;
-//                    break;
-//                }else{
-//                    printf("\n\n\n\n\nfddddddddddddddddddddddddddddddddddddddddddddd\n\n\n\n\n\n");
-//                    got_frame = 1;
-//                     len1 = frame.linesize[0];
-//
-//                }
-//
-//            }
-
-//
-//
-            len1 = avcodec_decode_audio4(acodec_ctx, &frame, &got_frame, &pkt);
-            printf("len1: %d\n", len1);
-
-            int len2 = frame.pkt_size;
-            // printf("len1 %d len2 %d\n", len1, len2);
-
-            if(len1 < 0) {
-                /* if error, skip frame */
-                audio_pkt_size = 0;
-                break;
-            }
-
-            audio_pkt_data += len1;
-            audio_pkt_size -= len1;
-
-            data_size = 0;
-            if(got_frame) {
-                // get size of data in frame
-                // data_size = av_samples_get_buffer_size(NULL, acodec_ctx->channels,
-                // 	frame.nb_samples, acodec_ctx->sample_fmt, 0);
-                // memcpy(audio_buf, frame.data[0], data_size);
-
-                // instead of get data from input audio frame, convert
-                // input frame to SDL2 recognizable audio frame
-                reframe = av_frame_alloc();
-                reframe->channel_layout = frame.channel_layout;
-                reframe->sample_rate = frame.sample_rate;
-                reframe->format = OUT_SAMPLE_FMT;
-                int ret = swr_convert_frame(swr, reframe, &frame);
-                if(ret < 0 ){
-                    // convert error, try next frame
-                    continue;
-                }
-                data_size = av_samples_get_buffer_size(NULL, reframe->channels,
-                                                       reframe->nb_samples,
-                                                       static_cast<AVSampleFormat>(reframe->format), 0);
-                memcpy(audio_buf, reframe->data[0], data_size);
-                av_frame_free(&reframe);
-            }
-            if(data_size <= 0) {
-                // nodata, get more frames
-                continue;
-            }
-            return data_size;
+    while (true) {
+        // get next packet
+        if (packet_queue_get(&audioq, &pkt, 1) < 0) {// no more packet
+            printf("Play audio completed, try shutdown\n");
+            quit = 1; // stop program
+            return -1;
         }
+        ret = avcodec_send_packet(acodec_ctx, &pkt);
+        if (ret < 0) {
+            printf("decoding failed: %s \n", av_err2str(ret));
+            /* if error, skip frame */
+            return -1;
+        } else {
+            while (ret >= 0) {
+                frame = av_frame_alloc();
+                ret = avcodec_receive_frame(acodec_ctx, frame);
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                    printf("Decoding audio: %s \n", av_err2str(ret));
+                    break;
+                } else {
+                    reframe = av_frame_alloc();
+                    reframe->channel_layout = frame->channel_layout;
+                    reframe->sample_rate = frame->sample_rate;
+                    reframe->format = OUT_SAMPLE_FMT;
+                    int swr_state = swr_convert_frame(swr, reframe, frame);
+                    if (swr_state < 0) {
+                        // convert error, try next frame
+                        printf("Audio convert error, try next frame\n");
+                        continue;
+                    }
+                    data_size += av_samples_get_buffer_size(NULL, reframe->channels,
+                                                           reframe->nb_samples,
+                                                           static_cast<AVSampleFormat>(reframe->format), 0);
+                    memcpy(audio_buf, reframe->data[0], static_cast<size_t>(data_size));
+                    av_frame_free(&reframe);
+                    av_frame_free(&frame);
+
+
+
+                }
+
+            }
+
+        }
+
         if(pkt.data) {// not null
             av_packet_unref(&pkt);
         }
         if(quit) {
             return -1;
         }
-        // get next packet
-        if(packet_queue_get(&audioq, &pkt, 1) < 0) {// no more packet
-            printf("Play audio completed, try shutdown\n");
-            quit = 1; // stop program
-            return -1;
-        }
-        printf("reached good\n");
-        //TODO new API
-//         avcodec_send_packet(stream_ctx[audio_stream_indx].dec_ctx, &pkt);
-        // end new API
 
-        audio_pkt_data = pkt.data;
-        audio_pkt_size = pkt.size;
+        if (data_size)
+            return data_size;
+
     }
 }
 void audio_callback(void *userdata, Uint8 *stream, int len) {
@@ -338,11 +293,13 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
             /* We have already sent all our data; get more */
             audio_size = audio_decode_frame(aCodecCtx, audio_buf, sizeof(audio_buf));
             if(audio_size < 0) {
+                printf("no more audio\n");
                 /* If error, output silence */
                 audio_buf_size = 1024; // arbitrary?
                 memset(audio_buf, 0, audio_buf_size);
-                printf("error \n");
-                exit(1);
+                quit = 1;
+                SDL_CloseAudio();
+                return;
             } else {
                 audio_buf_size = audio_size;
             }
@@ -444,6 +401,7 @@ static int init_sdl(){
 
     uvPitch = stream_ctx[video_stream_indx].dec_ctx->width / 2;
 
+
     // SDL audio init.
     SDL_memset(&wanted_spec, 0, sizeof(wanted_spec));
     wanted_spec.freq = stream_ctx[audio_stream_indx].dec_ctx->sample_rate ;
@@ -455,7 +413,6 @@ static int init_sdl(){
     wanted_spec.callback = audio_callback;
     // SDL will give our callback a void pointer to any user data that we want our callback function to have.
     wanted_spec.userdata = stream_ctx[audio_stream_indx].dec_ctx;
-
     if(SDL_OpenAudio(&wanted_spec, &spec) < 0) {
         fprintf(stderr, "SDL_OpenAudio: %s\n", SDL_GetError());
         exit(1);
@@ -479,7 +436,7 @@ int main(int argc, char **argv) {
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/half_frames.mp4");
+    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/cut.mp4");
     if (ret < 0) {
         printf("couldn't open input file\n");
         exit(1);
@@ -510,8 +467,8 @@ int main(int argc, char **argv) {
 
     int i = 0;
     // Read all packets.
-    int quit = 0;
     while (quit != 1) {
+        printf("in loop \n");
         SDL_PollEvent(&event);
         switch (event.type) {
             case SDL_QUIT:
@@ -524,7 +481,6 @@ int main(int argc, char **argv) {
 
         frame = av_frame_alloc();
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0) {
-            printf("error\n");
             if(put_all!=1){
                 printf("Complete read frames\n");
                 put_all = 1;
@@ -620,6 +576,9 @@ int main(int argc, char **argv) {
         }
 
     }
+    SDL_Quit();
+    av_frame_free(&frame);
+    swr_free(&swr);
 
     av_frame_free(&frame);
     for (int i = 0; i < ifmt_ctx->nb_streams; i++) {
