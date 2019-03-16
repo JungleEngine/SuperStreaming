@@ -6,7 +6,7 @@ from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Concatenate
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
 import datetime
 import matplotlib.pyplot as plt
@@ -210,23 +210,27 @@ class Pix2Pix():
 
 
 class Discriminator():
-    def __init__(self):
+    def __init__(self, load_path=None, save_path=None):
         # Input shape
         self.img_rows = 1000
         self.img_cols = 1000
         self.channels = 3
+        self.load_path = load_path
+        self.save_path = save_path
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         # Number of filters in the first layer of  D
         self.df = 64
 
         optimizer = Adam(0.0002, 0.5)
-
         # Build and compile the discriminator
-        self.discriminator = self.build_discriminator()
+        if self.load_path != None:
+            self.discriminator = load_model(load_path)
+        else:
+            self.discriminator = self.build_discriminator()
 
-        self.discriminator.compile(loss='mse',
-            optimizer=optimizer,
-            metrics=['accuracy'])
+            self.discriminator.compile(loss='mse',
+                optimizer=optimizer,
+                metrics=['accuracy'])
 
 
     def build_discriminator(self):
@@ -255,7 +259,7 @@ class Discriminator():
         output = Dense(1, activation='sigmoid')(flat)
         return Model([img_A, img_B], output)
 
-    def train(self, dataset_path, epochs=10, batch_size=5):
+    def train(self, dataset_path, epochs=10, batch_size=5, save_interval=1):
         data_loader = DataLoader(path=dataset_path,
                                       img_res=(1000, 1000))
 
@@ -268,9 +272,14 @@ class Discriminator():
                 # Plot the progress
                 print ("[Epoch %d/%d] [Batch %d/%d] [Disc_loss loss: %f, acc: %3d%%] time: %s" % (epoch, epochs,
                                                                         batch_i, data_loader.n_batches,
-                                                                        loss, 100*acc,
+                                                                       loss, 100*acc,
                                                                         elapsed_time))
             # TODO save model.
+            if epoch % save_interval == 0 and self.save_path != None:
+                self.discriminator.save_weights(self.save_path)
+                print(" Saving model at epoch %d" %(epoch))
+
+
 
 if __name__ == '__main__':
 
