@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from glob import glob
 import subprocess
+import optparse
 
 SPACE = 32
 LEFT_ARROW = 81
@@ -17,28 +18,39 @@ current_processing_index = 0
 
 
 if __name__ == '__main__':
-    input_path = "/media/syrix/programms/projects/GP/SuperStreaming/benchmark/skipping/images"
-    output_path = "/media/syrix/programms/projects/GP/SuperStreaming/benchmark/skipping/images"
+    parser = optparse.OptionParser()
+    parser.add_option('-i', '--input_path',
+                      action="store", dest="input_path",
+                      help="input_path", default="/media/syrix/programms/projects/GP/SuperStreaming/benchmark/skipping/images")
+
+    parser.add_option('-o', '--output_path',
+                      action="store", dest="output_path",
+                      help="output_path", default="/media/syrix/programms/projects/GP/SuperStreaming/benchmark/skipping/images")
+
+    options, args = parser.parse_args()
+
+
+
+
+    input_path = options.input_path
+    output_path = options.output_path
     imgs_paths = glob('%s/*' % (input_path))
     tag = {}
     for x in imgs_paths:
         tag[os.path.basename(x)] = -1
 
     print(
-        " press (1) to label image as good\n"
-        " press (2) to label image as bad\n"
-        " press (D) to proceed to next image\n"
-        " press (A) to go back\n"
+        " press (SPACE) to label image as good\n"
+        " press (->) to proceed to next image\n"
+        " press (<-) to go back\n"
         " press (S) to save current processed images\n"
-        " press (Q) to close app\n"
-        " press (E) to do nothing\n")
+        " press (Q) to close app\n")
 
     close_app = False
     while not close_app:
         img = cv2.imread(imgs_paths[current_processing_index])
         img_name = os.path.basename(imgs_paths[current_processing_index])
         img_folder_path = os.path.dirname(imgs_paths[current_processing_index])
-
 
         title = " Please label our image Mr. labeler"
         cv2.imshow(title, img)
