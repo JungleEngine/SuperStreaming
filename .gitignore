@@ -11,7 +11,7 @@ CTestTestfile.cmake
 cmake-build-*/
 *.png
 *.jpeg
-*.hd5
+
 *.3bhady
 *.samir
 *.pyc

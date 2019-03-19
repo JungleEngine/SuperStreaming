@@ -126,10 +126,10 @@ class Discriminator():
 
 if __name__ == '__main__':
 
-    discriminator = Discriminator(save_path="/media/syrix/programms/projects/GP/SuperStreaming/benchmark/skipping/models/model2.h5")
+    discriminator = Discriminator(save_path="/home/atarek/Desktop/SuperStreaming/benchmark/skipping/models/model2.h5")
 
     # discriminator.discriminator.summary()
-    discriminator.train("/media/syrix/programms/projects/GP/SuperStreaming/benchmark/skipping/dataset")
+    discriminator.train("/home/atarek/Desktop/SuperStreaming/benchmark/skipping/dataset")
 
     # gan = Pix2Pix()
     # gan.train(epochs=200, batch_size=1, sample_interval=200)
