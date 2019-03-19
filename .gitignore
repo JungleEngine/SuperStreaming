@@ -10,3 +10,11 @@ compile_commands.json
 CTestTestfile.cmake
 .idea
 cmake-build-*/
+*.png
+*.jpeg
+*.hd5
+*.3bhady
+*.samir
+*.pyc
+*.pcy
+*.ali
