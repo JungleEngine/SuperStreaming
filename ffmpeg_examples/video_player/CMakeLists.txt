@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.9)
 project(transcoding)
 
 set(CMAKE_CXX_STANDARD 11)
-
 find_path(AVCODEC_INCLUDE_DIR libavcodec/avcodec.h)
 find_library(AVCODEC_LIBRARY avcodec)
 find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h)

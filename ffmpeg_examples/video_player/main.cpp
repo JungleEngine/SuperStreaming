@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <zconf.h>
 
+
 extern "C"{
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -15,7 +16,18 @@ extern "C"{
 #include <libswresample/swresample.h>
 }
 
+/*  
+extern "C"{
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 
+#include <libavutil/timestamp.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
+#include <libswscale/swscale.h>
+#include <libswresample/swresample.h>
+}
+*/
 #define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE), AV_ERROR_MAX_STRING_SIZE, errnum)
 #define av_ts2str(ts) av_ts_make_string((char*)__builtin_alloca(AV_TS_MAX_STRING_SIZE), ts)
 
@@ -436,7 +448,7 @@ int main(int argc, char **argv) {
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/cut.mp4");
+    ret = open_input_file("/home/dawod/Videos/bazringosh.mp4");
     if (ret < 0) {
         printf("couldn't open input file\n");
         exit(1);
