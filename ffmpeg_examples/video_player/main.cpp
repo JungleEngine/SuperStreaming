@@ -479,7 +479,6 @@ int main(int argc, char **argv) {
                 break;
         }
 
-        frame = av_frame_alloc();
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0) {
             if(put_all!=1){
                 printf("Complete read frames\n");
@@ -510,6 +509,7 @@ int main(int argc, char **argv) {
             } else {
                 // Decode.
                 while (ret >= 0) {
+                    frame = av_frame_alloc();
                     ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
                     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                         break;
