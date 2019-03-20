@@ -4,6 +4,7 @@ CMakeScripts
 Testing
 Makefile
 Research
+ffmpeg_examples/video_player/transcoding
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
