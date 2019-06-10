@@ -553,8 +553,11 @@ int main(int argc, char **argv) {
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("rtsp://127.0.0.1:8000/gamar.mkv");
-    //ret = open_input_file("/home/dawod/Videos/bazringosh.mp4");
+
+    //input file can be local video on disk or remote from network.
+//  ret = open_input_file("rtsp://127.0.0.1:8000/gamar.mkv");
+    ret = open_input_file("rtsp://127.0.0.1:8554/baz.mkv");
+//  ret = open_input_file("/home/dawod/Videos/bazringosh.mp4");
     if (ret < 0) {
         printf("couldn't open input file\n");
         exit(1);
