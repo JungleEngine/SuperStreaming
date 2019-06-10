@@ -1,0 +1,13 @@
+to build the server please do the following : 
+---------------------------------------------
+tar -zxvf live555-latest.tar.gz
+cd live/
+./genMakefiles linux
+make
+cd mediaServer/
+cp ../../baz.mkv .
+./live555MediaServer 
+_____________________________________________
+Now, the server is running
+you can now go to : ffmpeg_examples/video_player
+and run :  $make && ./transcoding 
