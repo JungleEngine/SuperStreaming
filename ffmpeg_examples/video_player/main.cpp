@@ -231,18 +231,19 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block) {
 static int open_input_file(const char *filename) {
     int ret;
     unsigned int i;
-
-    ifmt_ctx = NULL;
+    ifmt_ctx = NULL; //Format I/O context.
+    // Open an input stream and read the header.The codecs are not opened yet. The stream must be closed later.
     if ((ret = avformat_open_input(&ifmt_ctx, filename, NULL, NULL)) < 0) {
         av_log(NULL, AV_LOG_ERROR, "Cannot open input file\n");
         return ret;
     }
-
+    // Read packets of a media file to get stream information. 
     if ((ret = avformat_find_stream_info(ifmt_ctx, NULL)) < 0) {
         av_log(NULL, AV_LOG_ERROR, "Cannot find stream information\n");
         return ret;
     }
 
+    // Allocating array for each stream in the input video file.
     stream_ctx = static_cast<StreamContext *>(av_mallocz_array(ifmt_ctx->nb_streams, sizeof(*stream_ctx)));
     if (!stream_ctx)
         return AVERROR(ENOMEM);
@@ -290,7 +291,12 @@ static int open_input_file(const char *filename) {
         stream_ctx[i].dec_ctx = codec_ctx;
     }
 
+    // Print detailed information about the input or output format, such as duration, 
+    // bitrate, streams, container, programs, metadata, side data, codec and time base. 
+    printf("______________________________________________________________________________\n");
     av_dump_format(ifmt_ctx, 0, filename, 0);
+    printf("______________________________________________________________________________\n");
+    
     return 0;
 }
 
@@ -391,49 +397,43 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
 }
 
 static int init_sdl(){
-
-    // create audio resampling, for converting audio from X format
-    // to compatible format with SDL2
-    swr = swr_alloc_set_opts(NULL,  // we're allocating a new context
-                             stream_ctx[audio_stream_indx].dec_ctx->channel_layout,  // out_ch_layout
-                             OUT_SAMPLE_FMT,    // out_sample_fmt
-                             stream_ctx[audio_stream_indx].dec_ctx->sample_rate,                // out_sample_rate
-                             stream_ctx[audio_stream_indx].dec_ctx->channel_layout, // in_ch_layout: stereo, blabla
+    // create audio resampling, for converting audio from X format to compatible format with SDL2 (The libswresample context)
+    // Libswresample (lswr) is a library that handles audio resampling, sample format conversion and mixing
+    swr = swr_alloc_set_opts(NULL,  // NULL because we're allocating a new context not using an existed one
+                             stream_ctx[audio_stream_indx].dec_ctx->channel_layout,  // output_channel_layout
+                             OUT_SAMPLE_FMT,    // out_sample_fmt : AV_SAMPLE_FMT_FLT (Format_Float)
+                             stream_ctx[audio_stream_indx].dec_ctx->sample_rate,   // out_sample_rate
+                             stream_ctx[audio_stream_indx].dec_ctx->channel_layout, // input_channel_layout: stereo, blabla
                              stream_ctx[audio_stream_indx].dec_ctx->sample_fmt,   // in_sample_fmt
                              stream_ctx[audio_stream_indx].dec_ctx->sample_rate,                // in_sample_rate
                              0,                    // log_offset
-                             NULL);
+                             NULL); //log_ctx
+    // Initialize context after user parameters have been set. 
     swr_init(swr);
 
-    /*
-     * SDL_Init() essentially tells the library what features we're going to use.
-     * SDL_GetError(), of course, is a handy debugging function.
-     */
+    // SDL_Init() essentially tells the library what features we're going to use.
+    // SDL_GetError(), of course, is a handy debugging function.
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER)) {
         fprintf(stderr, "Could not initialize SDL - %s\n", SDL_GetError());
         exit(1);
     }
 
     // Basically, SDL2 creates a window with a title, then a surface attached to it.
-    window = SDL_CreateWindow("StreamyPI",
+    window = SDL_CreateWindow("Xtream",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               stream_ctx[video_stream_indx].dec_ctx->width,
                               stream_ctx[video_stream_indx].dec_ctx->height, SDL_WINDOW_SHOWN);
-
     if (window == NULL) {
         fprintf(stderr, "Window could not be created: %s\n", SDL_GetError());
         return 1;
     }
-
-
-
+    //  create a 2D rendering context for a window. 
     renderer = SDL_CreateRenderer(window, -1, 0);
     if (!renderer) {
         fprintf(stderr, "SDL: could not create renderer - exiting\n");
         exit(1);
     }
-
-    // Allocate a place to put our YUV image on that screen
+    // Allocate a place to put our YUV image on that screen (YUV is a color encoding system typically used as part of a color image pipeline)
     texture = SDL_CreateTexture(
             renderer,
             SDL_PIXELFORMAT_YV12,
@@ -441,28 +441,25 @@ static int init_sdl(){
             stream_ctx[video_stream_indx].dec_ctx->width,
             stream_ctx[video_stream_indx].dec_ctx->height
     );
-
     if (!texture) {
         fprintf(stderr, "SDL: could not create texture - exiting\n");
         exit(1);
     }
 
-
-
-    // initialize SWS context for software scaling
-    sws_ctx = sws_getContext(stream_ctx[video_stream_indx].dec_ctx->width,
-                             stream_ctx[video_stream_indx].dec_ctx->height,
-                             stream_ctx[video_stream_indx].dec_ctx->pix_fmt,
-                             stream_ctx[video_stream_indx].dec_ctx->width,
-                             stream_ctx[video_stream_indx].dec_ctx->height,
-                             AV_PIX_FMT_YUV420P,
-                             SWS_BILINEAR,
-                             NULL,
-                             NULL,
-                             NULL
+    // initialize SWS context for software scaling (allow us to use Color conversion and scaling library (libswscale) )
+    sws_ctx = sws_getContext(stream_ctx[video_stream_indx].dec_ctx->width, //src_W
+                             stream_ctx[video_stream_indx].dec_ctx->height, //src_H
+                             stream_ctx[video_stream_indx].dec_ctx->pix_fmt, //src_Fmt
+                             stream_ctx[video_stream_indx].dec_ctx->width, //dst_W
+                             stream_ctx[video_stream_indx].dec_ctx->height, //dst_H
+                             AV_PIX_FMT_YUV420P, //dst_Format
+                             SWS_BILINEAR,  //flags
+                             NULL,  //dst_src_Filter
+                             NULL,  //dst_Filter
+                             NULL  //param
     );
 
-
+    // set up pixels buffers
     // set up YV12 pixel array (12 bits per pixel)
     yPlaneSz = stream_ctx[video_stream_indx].dec_ctx->width * stream_ctx[video_stream_indx].dec_ctx->height;
     uvPlaneSz = stream_ctx[video_stream_indx].dec_ctx->width * stream_ctx[video_stream_indx].dec_ctx->height / 4;
@@ -473,19 +470,19 @@ static int init_sdl(){
         fprintf(stderr, "Could not allocate pixel buffers - exiting\n");
         exit(1);
     }
-
     uvPitch = stream_ctx[video_stream_indx].dec_ctx->width / 2;
-
-
+    
     // SDL audio init.
-    SDL_memset(&wanted_spec, 0, sizeof(wanted_spec));
-    wanted_spec.freq = stream_ctx[audio_stream_indx].dec_ctx->sample_rate ;
-    wanted_spec.format = AUDIO_F32LSB;
-    wanted_spec.channels = static_cast<Uint8>(stream_ctx[audio_stream_indx].dec_ctx->channels);
+    // (SDL_AudioSpec)wanted_spec : A structure that contains the audio output format. 
+    // It also contains a callback that is called when the audio device needs more data. 
+    SDL_memset(&wanted_spec, 0, sizeof(wanted_spec)); //initialize it with zeors
+    wanted_spec.freq = stream_ctx[audio_stream_indx].dec_ctx->sample_rate ;  //DSP frequency (samples per second)
+    wanted_spec.format = AUDIO_F32LSB; //audio data format
+    wanted_spec.channels = static_cast<Uint8>(stream_ctx[audio_stream_indx].dec_ctx->channels); //number of separate sound channels
     // silence is 0 because it is signed format (+ve, -ve, 0)
-    wanted_spec.silence = 0;
-    wanted_spec.samples = SDL_AUDIO_BUFFER_SIZE;
-    wanted_spec.callback = audio_callback;
+    wanted_spec.silence = 0; //audio buffer silence value
+    wanted_spec.samples = SDL_AUDIO_BUFFER_SIZE; // audio buffer size in samples (power of 2)
+    wanted_spec.callback = audio_callback; //the function to call when the audio device needs more data
     // SDL will give our callback a void pointer to any user data that we want our callback function to have.
     wanted_spec.userdata = stream_ctx[audio_stream_indx].dec_ctx;
     if(SDL_OpenAudio(&wanted_spec, &spec) < 0) {
@@ -505,6 +502,7 @@ void event_handler(SDL_Event event, AVFrame* frame){
 	    case SDL_KEYDOWN:
 		if (event.key.keysym.sym == SDLK_ESCAPE || event.key.keysym.sym == SDLK_q) {
 			printf("DAWOD :*****************************************************************QUIT\n");
+			quit = 1;
 			do_quit(frame);
 			break;
 		}
@@ -557,131 +555,80 @@ int main(int argc, char **argv) {
     //input file can be local video on disk or remote from network.
 //  ret = open_input_file("rtsp://127.0.0.1:8000/gamar.mkv");
     ret = open_input_file("rtsp://127.0.0.1:8554/baz.mkv");
+//  ret = open_input_file("rtsp://127.0.0.1:8554/gamar.mp4");
+//  ret = open_input_file("rtsp://127.0.0.1:8554/baz.mpg");
 //  ret = open_input_file("/home/dawod/Videos/bazringosh.mp4");
     if (ret < 0) {
         printf("couldn't open input file\n");
         exit(1);
     }
 
-    // Init sdl lib.
-    init_sdl();
-
-    packet_queue_init(&audioq);
-    SDL_PauseAudio(0);
-
-
-    // Allocate an AVFrame structure
-    pFrameRGB = av_frame_alloc();
+    init_sdl();   // Init sdl lib.
+    packet_queue_init(&audioq);  // Inintializa the packetQueue by zeros and create mutex and condition variable.
+    SDL_PauseAudio(0);   //make sure that audio is not muted
+    pFrameRGB = av_frame_alloc();   // Allocate an AVFrame structure
     if (pFrameRGB == NULL)
         return -1;
 
-    // Determine required buffer size and allocate buffer
-    numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, stream_ctx[video_stream_indx].dec_ctx->width,
-                                        stream_ctx[video_stream_indx].dec_ctx->height,
-                                        16); // add +1 for height and width.
-
+    // Return the size in bytes of the amount of data required to store an image with the given parameters. 
+    numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, //pix_fmt
+		    stream_ctx[video_stream_indx].dec_ctx->width, //width
+		    stream_ctx[video_stream_indx].dec_ctx->height,  //height
+		    16); // add +1 for height and width to align.
+    // Allocating the buffer after  determining required buffer size.
     buffer = (uint8_t *) av_malloc(numBytes * sizeof(uint8_t));
-
-    av_image_fill_arrays(pFrameRGB->data, pFrameRGB->linesize, buffer, AV_PIX_FMT_RGB24,
-                         stream_ctx[video_stream_indx].dec_ctx->width, stream_ctx[video_stream_indx].dec_ctx->height,
-                         1);
+    // Setup the data pointers and linesizes based on the specified image parameters and the provided array. 
+    av_image_fill_arrays(pFrameRGB->data, pFrameRGB->linesize, //dst_data and dst_linesSize
+		    buffer, //src
+		    AV_PIX_FMT_RGB24, //pix_fmt
+		    stream_ctx[video_stream_indx].dec_ctx->width, stream_ctx[video_stream_indx].dec_ctx->height, //width and height
+		    1); //align
 
     int i = 0;
     // Read all packets.
-    while (quit != 1) {
-        printf("in loop \n");
-	SDL_PollEvent(&event);
-	printf("dawod : 1\n");
-	SDL_PumpEvents();
-	printf("dawod : 2\n");
-
-//    while (!SDL_PeepEvents(event, 1, SDL_GETEVENT, SDL_FIRSTEVENT, SDL_LASTEVENT)) {
-//	    SDL_PumpEvents();
-//    }
-
-	event_handler(event, frame);
-	printf("dawod : 3\n");
-
+    while (true) {
+	if(quit)
+		break;
+	i++;
+        printf("in loop %d\n",i);
+	SDL_PollEvent(&event); // Use this function to poll for currently pending events. without this function No event will be handled.
+	SDL_PumpEvents(); //Use this function to pump the event loop, gathering events from the input devices. 
+	event_handler(event, frame); //function that handles the events and make some changes to (frame) according to the requested events.
 
         if (is_paused != last_paused) {
-		last_paused = is_paused;
+		last_paused = is_paused; //change the current state to the new state (paused or not paused)
 		if (is_paused)
-			av_read_pause(ifmt_ctx);
+			av_read_pause(ifmt_ctx); //Pause a network-based stream (e.g. RTSP stream).
 		else
-			av_read_play(ifmt_ctx);
+			av_read_play(ifmt_ctx); // Start playing a network-based stream (e.g. RTSP stream). or resume after pausing.
         }
 
-
-
-
+	//If pause than goto the head of the loop and don't run the remaining code in the loop.
         if (is_paused) {
 		/*  wait 10 ms to avoid trying to get another packet */
-		/*  XXX: horrible */
 		SDL_Delay(10);
-		continue;
+		continue; 
 	}
 	
-
-/* 
-        if (is_seek_req) {
-            int64_t seek_target = is->seek_pos;
-            int64_t seek_min    = is->seek_rel > 0 ? seek_target - is->seek_rel + 2: INT64_MIN;
-            int64_t seek_max    = is->seek_rel < 0 ? seek_target - is->seek_rel - 2: INT64_MAX;
-// FIXME the +-2 is due to rounding being not done in the correct direction in generation
-//      of the seek_pos/seek_rel variables
-
-            ret = avformat_seek_file(is->ic, -1, seek_min, seek_target, seek_max, is->seek_flags);
-            if (ret < 0) {
-                av_log(NULL, AV_LOG_ERROR,
-                       "%s: error while seeking\n", is->ic->url);
-            } else {
-                if (is->audio_stream >= 0) {
-                    packet_queue_flush(&is->audioq);
-                    packet_queue_put(&is->audioq, &flush_pkt);
-                }
-                if (is->subtitle_stream >= 0) {
-                    packet_queue_flush(&is->subtitleq);
-                    packet_queue_put(&is->subtitleq, &flush_pkt);
-                }
-                if (is->video_stream >= 0) {
-                    packet_queue_flush(&is->videoq);
-                    packet_queue_put(&is->videoq, &flush_pkt);
-                }
-                if (is->seek_flags & AVSEEK_FLAG_BYTE) {
-                   set_clock(&is->extclk, NAN, 0);
-                } else {
-                   set_clock(&is->extclk, seek_target / (double)AV_TIME_BASE, 0);
-                }
-            }
-            is->seek_req = 0;
-            is->queue_attachments_req = 1;
-            is->eof = 0;
-            if (is->paused)
-                step_to_next_frame(is);
-        }
-*/
-
-	if(!is_paused){
-		if ((ret = av_read_frame(ifmt_ctx, packet)) < 0) {
-			if(put_all!=1){
-				printf("Complete read frames\n");
-				put_all = 1;
-			}
-			sleep(1);
-			continue;
+	
+	
+	if ((ret = av_read_frame(ifmt_ctx, packet)) < 0) {
+		if(put_all!=1){
+			printf("Complete read frames\n");
+			put_all = 1;
 		}
-		
-		if (first_packet_size_read == 0)
-			first_packet_size_read = packet->size;
-		stream_index = packet->stream_index;
-		type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
-		av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
-				stream_index);
-		
-		av_packet_rescale_ts(packet,
-				ifmt_ctx->streams[stream_index]->time_base,
-				stream_ctx[stream_index].dec_ctx->time_base);
+		sleep(1);
+		continue;
 	}
+	if (first_packet_size_read == 0)
+		first_packet_size_read = packet->size;
+	stream_index = packet->stream_index;
+	type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
+	av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
+			stream_index);
+	av_packet_rescale_ts(packet,
+			ifmt_ctx->streams[stream_index]->time_base,
+			stream_ctx[stream_index].dec_ctx->time_base);
 	
 	
 	
@@ -761,18 +708,28 @@ int main(int argc, char **argv) {
 
     }
     SDL_Quit();
+    printf("q0\n");
     av_frame_free(&frame);
+    printf("q1\n");
     swr_free(&swr);
+    printf("q2\n");
 
     av_frame_free(&frame);
+    printf("q3\n");
     for (int i = 0; i < ifmt_ctx->nb_streams; i++) {
+    printf("q4\n");
         avcodec_free_context(&stream_ctx[i].dec_ctx);
+    printf("q5\n");
         if (ofmt_ctx && ofmt_ctx->nb_streams > i && ofmt_ctx->streams[i] && stream_ctx[i].enc_ctx)
             avcodec_free_context(&stream_ctx[i].enc_ctx);
+    printf("q6\n");
     }
 
+    printf("q7\n");
     av_free(stream_ctx);
+    printf("q8\n");
     avformat_close_input(&ifmt_ctx);
+    printf("q9\n");
 
     return 0;
 
