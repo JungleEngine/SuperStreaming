@@ -162,29 +162,6 @@ int packet_queue_put(PacketQueue *q, AVPacket *pkt) {
 }
 
 
-
-/* 
-static void packet_queue_flush(PacketQueue *q)
-{
-    MyAVPacketList *pkt, *pkt1;
-
-    SDL_LockMutex(q->mutex);
-    for (pkt = q->first_pkt; pkt; pkt = pkt1) {
-        pkt1 = pkt->next;
-        av_packet_unref(&pkt->pkt);
-        av_freep(&pkt);
-    }
-    q->last_pkt = NULL;
-    q->first_pkt = NULL;
-    q->nb_packets = 0;
-    q->size = 0;
-    q->duration = 0;
-    SDL_UnlockMutex(q->mutex);
-}
-*/
-
-
-
 // Pull packet from queue.
 // May be blocket until packet received or just continue without blocking.
 int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block) {
@@ -300,6 +277,10 @@ static int open_input_file(const char *filename) {
     return 0;
 }
 
+/*
+ * This function is very similar to video decode frame steps in the main function in the infinite loop
+ * But here we get packet from the top of the AudioQueue and decode to generate the sound.
+ */
 int audio_decode_frame(AVCodecContext * acodec_ctx, uint8_t *audio_buf, int buf_size) {
     static AVPacket pkt;
     static AVFrame *frame, *reframe;
@@ -360,6 +341,11 @@ int audio_decode_frame(AVCodecContext * acodec_ctx, uint8_t *audio_buf, int buf_
 
     }
 }
+
+/*
+ * This function will be called automatically when audio device needs more data
+ * So we put it as calback value for SDL_AudioSpec.callback variable
+ */
 void audio_callback(void *userdata, Uint8 *stream, int len) {
 
     AVCodecContext *aCodecCtx = (AVCodecContext *)userdata;
@@ -371,7 +357,8 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
 
     while(len > 0) {
         if(audio_buf_index >= audio_buf_size) {
-            /* We have already sent all our data; get more */
+            // We have already sent all our data; get more 
+	    // We neeed first to decode the audio frame 
             audio_size = audio_decode_frame(aCodecCtx, audio_buf, sizeof(audio_buf));
             if(audio_size < 0) {
                 printf("no more audio\n");
@@ -379,6 +366,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
                 audio_buf_size = 1024; // arbitrary?
                 memset(audio_buf, 0, audio_buf_size);
                 quit = 1;
+		//TODO : we may need to use do_quit() here!
                 SDL_CloseAudio();
                 return;
             } else {
@@ -386,6 +374,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len) {
             }
             audio_buf_index = 0;
         }
+	//We still have some data in the buffer or we have get the needed data to work on.
         len1 = audio_buf_size - audio_buf_index;
         if(len1 > len)
             len1 = len;
@@ -498,15 +487,18 @@ void event_handler(SDL_Event event, AVFrame* frame){
             case SDL_QUIT:
                 printf("SDL receive stop, try shutdown\n");
                 quit = 1;
+//		do_quit(frame);
                 break;
 	    case SDL_KEYDOWN:
-		if (event.key.keysym.sym == SDLK_ESCAPE || event.key.keysym.sym == SDLK_q) {
-			printf("DAWOD :*****************************************************************QUIT\n");
-			quit = 1;
-			do_quit(frame);
-			break;
-		}
+	//	if (event.key.keysym.sym == SDLK_ESCAPE || event.key.keysym.sym == SDLK_q) {
+	//	}
 		switch (event.key.keysym.sym) {
+			case SDLK_q:
+			case SDLK_ESCAPE:
+				printf("DAWOD :*****************************************************************QUIT\n");
+				quit = 1;
+//				do_quit(frame);
+				break;
 			case SDLK_SPACE:
 			case SDLK_p:
 				if (!is_paused){
@@ -587,13 +579,21 @@ int main(int argc, char **argv) {
     int i = 0;
     // Read all packets.
     while (true) {
-	if(quit)
-		break;
 	i++;
         printf("in loop %d\n",i);
 	SDL_PollEvent(&event); // Use this function to poll for currently pending events. without this function No event will be handled.
 	SDL_PumpEvents(); //Use this function to pump the event loop, gathering events from the input devices. 
 	event_handler(event, frame); //function that handles the events and make some changes to (frame) according to the requested events.
+
+
+
+	if(quit)
+	{
+		printf("DAWOD : quit and break\n");
+		//TODO: you may need to call do_quit(frame) function here !
+		break;
+	}
+	
 
         if (is_paused != last_paused) {
 		last_paused = is_paused; //change the current state to the new state (paused or not paused)
@@ -609,19 +609,23 @@ int main(int argc, char **argv) {
 		SDL_Delay(10);
 		continue; 
 	}
-	
-	
-	
+
+	// check if the video end.
 	if ((ret = av_read_frame(ifmt_ctx, packet)) < 0) {
 		if(put_all!=1){
 			printf("Complete read frames\n");
 			put_all = 1;
+			//TODO : you may need to call do_quit(frame) here. also (use put_all or delete it)!
 		}
 		sleep(1);
 		continue;
 	}
-	if (first_packet_size_read == 0)
-		first_packet_size_read = packet->size;
+
+//	if (first_packet_size_read == 0) //TODO : you can remove this line
+//		first_packet_size_read = packet->size; //TODO : you can remove this line
+
+
+	//get the type of the stream to be able to decode the incoming packets and transform in into video frames.
 	stream_index = packet->stream_index;
 	type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
 	av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
@@ -630,12 +634,11 @@ int main(int argc, char **argv) {
 			ifmt_ctx->streams[stream_index]->time_base,
 			stream_ctx[stream_index].dec_ctx->time_base);
 	
-	
-	
+	// Here we check if the type is video, then we decode the video frame to generate the picture of it durectly
+	// We didn't use VideoQueue here as we had done with the Audio.	
 	if (type == AVMEDIA_TYPE_VIDEO) {
+		printf("dawod : video type \n");
 		largest_input_packet_size = std::max(largest_input_packet_size, packet->size);
-
-	    
 		if(!is_paused)
 		{
 			ret = avcodec_send_packet(stream_ctx[stream_index].dec_ctx, packet);
@@ -657,9 +660,7 @@ int main(int argc, char **argv) {
 					    exit(1);
 				    }
 				    
-				    
 				    received_frames++;
-				    
 				    AVFrame pict;
 				    pict.data[0] = yPlane;
 				    pict.data[1] = uPlane;
@@ -672,7 +673,6 @@ int main(int argc, char **argv) {
 				    sws_scale(sws_ctx, (const uint8_t *const *) frame,
 						    frame->linesize, 0, stream_ctx[stream_index].dec_ctx->height,
 						    pict.data, pict.linesize);
-				    
 				    
 				    SDL_UpdateYUVTexture(
 					    texture,
@@ -688,10 +688,8 @@ int main(int argc, char **argv) {
 				    SDL_RenderClear(renderer);
 				    SDL_RenderCopy(renderer, texture, NULL, NULL);
 				    SDL_RenderPresent(renderer);
-		    
-				    
+		   
 				    printf("showing frame:%d \n", ++received_frames);
-				    
 				    av_frame_free(&frame);
 				    if (ret < 0) {
 					    printf("badddd\n");
@@ -703,11 +701,11 @@ int main(int argc, char **argv) {
 	
 	} 
 	else if (type == AVMEDIA_TYPE_AUDIO) {
-		packet_queue_put(&audioq, packet);
+		printf("dawod : audio type\n");
+		packet_queue_put(&audioq, packet); //pop the packet from the queue
 	}
 
     }
-    SDL_Quit();
     printf("q0\n");
     av_frame_free(&frame);
     printf("q1\n");
@@ -730,7 +728,14 @@ int main(int argc, char **argv) {
     printf("q8\n");
     avformat_close_input(&ifmt_ctx);
     printf("q9\n");
-
+    avformat_network_deinit(); 
+//    if (renderer)
+//	    SDL_DestroyRenderer(renderer);
+//   if (window)
+//	    SDL_DestroyWindow(window);
+   
+//TODO : this function cause the program to crash! solve this problem
+    SDL_Quit();
     return 0;
 
 }
