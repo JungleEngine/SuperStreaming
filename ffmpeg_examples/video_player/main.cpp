@@ -25,7 +25,7 @@ int main()
     videoState = static_cast<VideoState *>(av_mallocz(sizeof(VideoState)));
 
     // copy the file name input by the user to the VideoState structure
-    videoState->filename = "/media/syrix/programms/projects/GP/fun.mp4";
+    videoState->filename = "/media/syrix/programms/projects/GP/got.mp4";
     // parse max frames to decode input by the user
     char * pEnd;
     videoState->maxFramesToDecode =10000;
