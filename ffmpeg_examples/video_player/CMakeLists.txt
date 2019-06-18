@@ -13,7 +13,7 @@ find_library(AVUTIL_LIBRARY avutil)
 find_path(AVRESAMPLE_INCLUDE_DIR libavresample/avresample.h)
 find_library(AVRESAMPLE_LIBRARY avresample)
 
-find_library(SDL_IMAGE_LIBRARY avresample)
+#find_library(SDL_IMAGE_LIBRARY avresample)
 
 find_path(LIBSWSCALE_INCLUDE_DIRS libswscale/swscale.h)
 find_library(SWSCALE_LIBRARY swscale)
@@ -26,6 +26,6 @@ find_library(SDL2_LIBRARY SDL2)
 
 add_executable(transcoding main.cpp player.h)
 target_include_directories(transcoding PRIVATE ${AVCODEC_INCLUDE_DIR} ${AVFORMAT_INCLUDE_DIR} ${AVUTIL_INCLUDE_DIR}
-        ${AVRESAMPLE_INCLUDE_DIR} ${LIBSWSCALE_INCLUDE_DIRS} ${SDL2_INCLUDE_DIR} ${SWRESAMPLE_INCLUDE_DIR} ${SDL_IMAGE_INCLUDE_DIR})
+        ${AVRESAMPLE_INCLUDE_DIR} ${LIBSWSCALE_INCLUDE_DIRS} ${SDL2_INCLUDE_DIR} ${SWRESAMPLE_INCLUDE_DIR})
 target_link_libraries(transcoding PRIVATE ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY} ${AVUTIL_LIBRARY} ${AVRESAMPLE_LIBRARY}
-        ${SWSCALE_LIBRARY} ${SDL2_LIBRARY} ${SWRESAMPLE_LIBRARY} ${SDL_IMAGE_LIBRARY})
+        ${SWSCALE_LIBRARY} ${SDL2_LIBRARY} ${SWRESAMPLE_LIBRARY})
