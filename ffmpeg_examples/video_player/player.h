@@ -1247,8 +1247,8 @@ void alloc_picture(void * userdata)
     int numBytes;
     numBytes = av_image_get_buffer_size(
             AV_PIX_FMT_YUV420P,
-            videoState->video_ctx->width,
-            videoState->video_ctx->height,
+            videoState->window_width,
+            videoState->window_height,
             32
     );
 
