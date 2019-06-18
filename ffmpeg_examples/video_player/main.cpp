@@ -5,6 +5,7 @@ int main()
 {
 
     av_register_all();
+    avformat_network_init();
     int ret = -1;
 
     /**
@@ -25,18 +26,21 @@ int main()
     videoState = static_cast<VideoState *>(av_mallocz(sizeof(VideoState)));
 
     // copy the file name input by the user to the VideoState structure
-    videoState->filename = "/media/syrix/programms/projects/GP/got.mp4";
+//    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
+//    "rtsp://127.0.1.1:8554/GOT.mkv"
+    videoState->filename = "rtsp://127.0.1.1:8554/baz.mkv";
     // parse max frames to decode input by the user
     char * pEnd;
-    videoState->maxFramesToDecode =10000;
+    videoState->maxFramesToDecode =100000000000000;
 
     // initialize locks for the display buffer (pictq)
     videoState->pictq_mutex = SDL_CreateMutex();
     videoState->pictq_cond = SDL_CreateCond();
-    create_window(videoState, "SuperStreaming|TV", 720, 480);
+    create_window(videoState, "SuperStreaming|TV", 1920, 1080);
 
     // launch our threads by pushing an SDL_event of type FF_REFRESH_EVENT
-    schedule_refresh(videoState, 100);
+    schedule_refresh(videoState, 1);
+    videoState->av_sync_type = DEFAULT_AV_SYNC_TYPE;
 
     // start the decoding thread to read data from the AVFormatContext
     videoState->decode_tid = SDL_CreateThread(decode_thread, "Decoding Thread", videoState);

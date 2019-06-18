@@ -31,6 +31,12 @@ extern "C"{
 #include<vector>
 #include<string>
 using namespace std;
+
+/**
+ * Debug flag.
+ */
+#define _DEBUG_ 1
+
 /**
  * SDL audio buffer size in samples.
  */
@@ -39,18 +45,18 @@ using namespace std;
 /**
  * Maximum number of samples per channel in an audio frame.
  */
-#define MAX_AUDIO_FRAME_SIZE 192000
+#define MAX_AUDIO_FRAME_SIZE 19200000
 
 /**
  * Audio packets queue maximum size.
  */
 
-#define MAX_AUDIOQ_SIZE (5 * 16 * 1024)
+#define MAX_AUDIOQ_SIZE (5 * 16 * 1989119 * 30)
 
 /**
  * Video packets queue maximum size.
  */
-#define MAX_VIDEOQ_SIZE (5 * 256 * 1024)
+#define MAX_VIDEOQ_SIZE (26549449 * 10)
 
 
 /**
@@ -62,6 +68,17 @@ using namespace std;
  * No AV sync correction is done if the clock difference is below the minimum AV sync threshold.
  */
 #define AV_NOSYNC_THRESHOLD 1.0
+
+/**
+ *
+ */
+#define SAMPLE_CORRECTION_PERCENT_MAX 10
+
+/**
+ *
+ */
+#define AUDIO_DIFF_AVG_NB 20
+
 /**
  * Custom SDL_Event type.
  * Notifies the next video frame has to be displayed.
@@ -78,6 +95,8 @@ using namespace std;
  * Video Frame queue size.
  */
 #define VIDEO_PICTURE_QUEUE_SIZE 1
+
+#define DEFAULT_AV_SYNC_TYPE AV_SYNC_AUDIO_MASTER
 
 /**
  * Prevents SDL from overriding main().
@@ -109,7 +128,7 @@ public:
     int         width;
     int         height;
     int         allocated;
-    double pts;
+    double      pts;
 };
 
 SDL_Window* screen = NULL;
@@ -156,14 +175,19 @@ public:
     AVStream *          video_st;
     AVCodecContext *    video_ctx;
     SDL_Texture *       texture;
-    SDL_Renderer *      renderer = NULL;
-    SDL_Renderer *      Renderer;
+    SDL_Renderer *      renderer;
     PacketQueue         videoq;
-    struct SwsContext *sws_ctx = NULL;
-    double  frame_timer;
-    double  frame_last_pts;
-    double  frame_last_delay;
-    double video_clock;
+    SwsContext *sws_ctx;
+    double              frame_timer;
+    double              frame_last_pts;
+    double              frame_last_delay;
+    double              video_clock;
+    double              video_current_pts;
+    int64_t             video_current_pts_time;
+    double              audio_diff_cum;
+    double              audio_diff_avg_coef;
+    double              audio_diff_threshold;
+    int                 audio_diff_avg_count;
 
     VideoPicture        pictq[VIDEO_PICTURE_QUEUE_SIZE];
     int                 pictq_size;
@@ -172,11 +196,19 @@ public:
     SDL_mutex *         pictq_mutex;
     SDL_cond *          pictq_cond;
 
+    SDL_Renderer*       Renderer;
     /**
      * Threads.
      */
     SDL_Thread *    decode_tid;
     SDL_Thread *    video_tid;
+
+    /**
+     * AV Sync.
+     */
+    int     av_sync_type;
+    double  external_clock;
+    int64_t external_clock_time;
 
     /**
      * Input file name.
@@ -216,6 +248,27 @@ public:
 
 };
 
+/**
+ * Audio Video Sync Types.
+ */
+enum
+{
+    /**
+     * Sync to audio clock.
+     */
+            AV_SYNC_AUDIO_MASTER,
+
+    /**
+     * Sync to video clock.
+     */
+            AV_SYNC_VIDEO_MASTER,
+
+    /**
+     * Sync to external clock: the computer clock
+     */
+            AV_SYNC_EXTERNAL_MASTER,
+};
+
 
 int create_window(VideoState* videoState, string window_name, int width, int height){
     // create a window with the specified position, dimensions, and flags.
@@ -237,7 +290,7 @@ int create_window(VideoState* videoState, string window_name, int width, int hei
     videoState->Renderer = SDL_CreateRenderer(screen, -1, 0);
     if (!videoState->Renderer) {
         fprintf(stderr, "SDL: could not create renderer - exiting\n");
-        exit(1);
+        return 1;
     }
 
     // create a texture for a rendering context
@@ -250,7 +303,7 @@ int create_window(VideoState* videoState, string window_name, int width, int hei
     );
     if (!videoState->texture) {
         fprintf(stderr, "SDL: could not create texture - exiting\n");
-        exit(1);
+        return -1;
     }
 
     videoState->window_width = width;
@@ -705,6 +758,213 @@ static int audio_resampling(
 }
 
 /**
+ * Calculates and returns the current video clock reference value.
+ *
+ * @param   videoState  the global VideoState reference.
+ *
+ * @return              the current video clock reference value.
+ */
+double get_video_clock(VideoState * videoState)
+{
+    double delta = (av_gettime() - videoState->video_current_pts_time) / 1000000.0;
+
+    return videoState->video_current_pts + delta;
+}
+
+
+/**
+ * Calculates and returns the current audio clock reference value.
+ *
+ * @param   videoState  the global VideoState reference.
+ *
+ * @return              the current audio clock reference value.
+ */
+double get_audio_clock(VideoState * videoState)
+{
+    double pts = videoState->audio_clock;
+
+    int hw_buf_size = videoState->audio_buf_size - videoState->audio_buf_index;
+
+    int bytes_per_sec = 0;
+
+    int n = 2 * videoState->audio_ctx->channels;
+
+    if (videoState->audio_st)
+    {
+        bytes_per_sec = videoState->audio_ctx->sample_rate * n;
+    }
+
+    if (bytes_per_sec)
+    {
+        pts -= (double) hw_buf_size / bytes_per_sec;
+    }
+
+    return pts;
+}
+
+/**
+ * Calculates and returns the current external clock reference value: the computer
+ * clock.
+ *
+ * @return  the current external clock reference value.
+ */
+double get_external_clock(VideoState * videoState)
+{
+    videoState->external_clock_time = av_gettime();
+    videoState->external_clock = videoState->external_clock_time / 1000000.0;
+
+    return videoState->external_clock;
+}
+
+/**
+ * Checks the VideoState global reference av_sync_type variable and then calls
+ * get_audio_clock, get_video_clock, or get_external_clock accordingly.
+ *
+ * @param   videoState  the global VideoState reference.
+ *
+ * @return              the reference clock according to the chosen AV sync type.
+ */
+double get_master_clock(VideoState * videoState)
+{
+    if (videoState->av_sync_type == AV_SYNC_VIDEO_MASTER)
+    {
+        return get_video_clock(videoState);
+    }
+    else if (videoState->av_sync_type == AV_SYNC_AUDIO_MASTER)
+    {
+        return get_audio_clock(videoState);
+    }
+    else if (videoState->av_sync_type == AV_SYNC_EXTERNAL_MASTER)
+    {
+        return get_external_clock(videoState);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Undefined A/V sync type.");
+        return -1;
+    }
+}
+
+
+/**
+ * So we're going to use a fractional coefficient, say c, and So now let's say
+ * we've gotten N audio sample sets that have been out of sync. The amount we are
+ * out of sync can also vary a good deal, so we're going to take an average of how
+ * far each of those have been out of sync. So for example, the first call might
+ * have shown we were out of sync by 40ms, the next by 50ms, and so on. But we're
+ * not going to take a simple average because the most recent values are more
+ * important than the previous ones. So we're going to use a fractional coefficient,
+ * say c, and sum the differences like this: diff_sum = new_diff + diff_sum*c.
+ * When we are ready to find the average difference, we simply calculate
+ * avg_diff = diff_sum * (1-c).
+ *
+ * @param   videoState      the global VideoState reference.
+ * @param   samples         global VideoState reference audio buffer.
+ * @param   samples_size    last decoded audio AVFrame size after resampling.
+ *
+ * @return
+ */
+int synchronize_audio(VideoState * videoState, short * samples, int samples_size)
+{
+    int n;
+    double ref_clock;
+
+    n = 2 * videoState->audio_ctx->channels;
+
+    // check if
+    if (videoState->av_sync_type != AV_SYNC_AUDIO_MASTER)
+    {
+        double diff, avg_diff;
+        int wanted_size, min_size, max_size /*, nb_samples */;
+
+        ref_clock = get_master_clock(videoState);
+        diff = get_audio_clock(videoState) - ref_clock;
+
+        if (diff < AV_NOSYNC_THRESHOLD)
+        {
+            // accumulate the diffs
+            videoState->audio_diff_cum = diff + videoState->audio_diff_avg_coef * videoState->audio_diff_cum;
+
+            if (videoState->audio_diff_avg_count < AUDIO_DIFF_AVG_NB)
+            {
+                videoState->audio_diff_avg_count++;
+            }
+            else
+            {
+                avg_diff = videoState->audio_diff_cum * (1.0 - videoState->audio_diff_avg_coef);
+
+                /**
+                 * So we're doing pretty well; we know approximately how off the audio
+                 * is from the video or whatever we're using for a clock. So let's now
+                 * calculate how many samples we need to add or lop off by putting this
+                 * code where the "Shrinking/expanding buffer code" section is:
+                 */
+                if (abs(avg_diff) >= videoState->audio_diff_threshold)
+                {
+                    wanted_size = samples_size + ((int)(diff * videoState->audio_ctx->sample_rate) * n);
+                    min_size = samples_size * ((100 - SAMPLE_CORRECTION_PERCENT_MAX) / 100);
+                    max_size = samples_size * ((100 + SAMPLE_CORRECTION_PERCENT_MAX) / 100);
+
+                    if(wanted_size < min_size)
+                    {
+                        wanted_size = min_size;
+                    }
+                    else if (wanted_size > max_size)
+                    {
+                        wanted_size = max_size;
+                    }
+
+                    /**
+                     * Now we have to actually correct the audio. You may have noticed that our
+                     * synchronize_audio function returns a sample size, which will then tell us
+                     * how many bytes to send to the stream. So we just have to adjust the sample
+                     * size to the wanted_size. This works for making the sample size smaller.
+                     * But if we want to make it bigger, we can't just make the sample size larger
+                     * because there's no more data in the buffer! So we have to add it. But what
+                     * should we add? It would be foolish to try and extrapolate audio, so let's
+                     * just use the audio we already have by padding out the buffer with the
+                     * value of the last sample.
+                     */
+                    if(wanted_size < samples_size)
+                    {
+                        /* remove samples */
+                        samples_size = wanted_size;
+                    }
+                    else if(wanted_size > samples_size)
+                    {
+                        uint8_t *samples_end, *q;
+                        int nb;
+
+                        /* add samples by copying final sample*/
+                        nb = (samples_size - wanted_size);
+                        samples_end = (uint8_t *)samples + samples_size - n;
+                        q = samples_end + n;
+
+                        while(nb > 0)
+                        {
+                            memcpy(q, samples_end, n);
+                            q += n;
+                            nb -= n;
+                        }
+
+                        samples_size = wanted_size;
+                    }
+                }
+            }
+        }
+        else
+        {
+            /* difference is TOO big; reset diff stuff */
+            videoState->audio_diff_avg_count = 0;
+            videoState->audio_diff_cum = 0;
+        }
+    }
+
+    return samples_size;
+}
+
+
+/**
  * Get a packet from the queue if available. Decode the extracted packet. Once
  * we have the frame, resample it and simply copy it to our audio buffer, making
  * sure the data_size is smaller than our audio buffer.
@@ -713,13 +973,19 @@ static int audio_resampling(
  * @param   audio_buf   the audio buffer to write into
  * @param   buf_size    the size of the audio buffer, 1.5 larger than the one
  *                      provided by FFmpeg
- * @param   pts_ptr
+ * @param   pts_ptr     a pointer to the pts of the decoded audio frame.
  *
  * @return              0 if everything goes well, -1 in case of error or quit
  */
 int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_size, double * pts_ptr)
 {
+    // allocate AVPacket to read from the audio PacketQueue (audioq)
     AVPacket * avPacket = av_packet_alloc();
+    if (avPacket == NULL)
+    {
+        printf("Could not allocate AVPacket.\n");
+        return -1;
+    }
 
     static uint8_t * audio_pkt_data = NULL;
     static int audio_pkt_size = 0;
@@ -739,6 +1005,8 @@ int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_siz
     int len1 = 0;
     int data_size = 0;
 
+    // infinite loop: read AVPackets from the audio PacketQueue, decode them into
+    // audio frames, resample the obtained frame and update the audio buffer
     for (;;)
     {
         // check global quit flag
@@ -747,30 +1015,40 @@ int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_siz
             return -1;
         }
 
+        // check if we obtained an AVPacket from the audio PacketQueue
         while (audio_pkt_size > 0)
         {
             int got_frame = 0;
 
+            // get decoded output data from decoder
             int ret = avcodec_receive_frame(videoState->audio_ctx, avFrame);
+
+            // check and entire audio frame was decoded
             if (ret == 0)
             {
                 got_frame = 1;
             }
+
+            // check the decoder needs more AVPackets to be sent
             if (ret == AVERROR(EAGAIN))
             {
                 ret = 0;
             }
+
             if (ret == 0)
             {
+                // give the decoder raw compressed data in an AVPacket
                 ret = avcodec_send_packet(videoState->audio_ctx, avPacket);
             }
+
+            // check the decoder needs more AVPackets to be sent
             if (ret == AVERROR(EAGAIN))
             {
                 ret = 0;
             }
             else if (ret < 0)
             {
-                printf("avcodec_receive_frame error");
+                printf("avcodec_receive_frame decoding error.\n");
                 return -1;
             }
             else
@@ -789,9 +1067,10 @@ int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_siz
             audio_pkt_size -= len1;
             data_size = 0;
 
+            // if we decoded an entire audio frame
             if (got_frame)
             {
-                // audio resampling
+                // apply audio resampling to the decoded frame
                 data_size = audio_resampling(
                         videoState,
                         avFrame,
@@ -808,18 +1087,7 @@ int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_siz
                 continue;
             }
 
-            /* Keep audio_clock up-to-date */
-            /**
-             * Now it's time for us to implement the audio clock. We can update the
-             * clock time in our audio_decode_frame function, which is where we decode
-             * the audio. Now, remember that we don't always process a new packet
-             * every time we call this function, so there are two places we have to
-             * update the clock at. The first place is where we get the new packet:
-             * we simply set the audio clock to the packet's PTS. Then if a packet
-             * has multiple frames, we keep time the audio play by counting the number
-             * of samples and multiplying them by the given samples-per-second rate.
-             * So once we have the packet:
-             */
+            // keep audio_clock up-to-date
             pts = videoState->audio_clock;
             *pts_ptr = pts;
             n = 2 * videoState->audio_ctx->channels;
@@ -847,7 +1115,7 @@ int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_siz
         audio_pkt_data = avPacket->data;
         audio_pkt_size = avPacket->size;
 
-        /* And once more when we are done processing the packet */
+        // keep audio_clock up-to-date
         if (avPacket->pts != AV_NOPTS_VALUE)
         {
             videoState->audio_clock = av_q2d(videoState->audio_st->time_base)*avPacket->pts;
@@ -857,26 +1125,26 @@ int audio_decode_frame(VideoState * videoState, uint8_t * audio_buf, int buf_siz
     return 0;
 }
 
+
+
 /**
  * Pull in data from audio_decode_frame(), store the result in an intermediary
  * buffer, attempt to write as many bytes as the amount defined by len to
  * stream, and get more data if we don't have enough yet, or save it for later
  * if we have some left over.
  *
- * @param userdata  the pointer we gave to SDL.
- * @param stream    the buffer we will be writing audio data to.
- * @param len       the size of that buffer.
+ * @param   userdata    the pointer we gave to SDL.
+ * @param   stream      the buffer we will be writing audio data to.
+ * @param   len         the size of that buffer.
  */
 void audio_callback(void * userdata, Uint8 * stream, int len)
 {
     // retrieve the VideoState
     VideoState * videoState = (VideoState *)userdata;
 
-    int len1 = -1;
-    unsigned int audio_size = -1;
-
     double pts;
 
+    // while the length of the audio data buffer is > 0
     while (len > 0)
     {
         // check global quit flag
@@ -885,10 +1153,16 @@ void audio_callback(void * userdata, Uint8 * stream, int len)
             return;
         }
 
+        // check how much audio is left to writes
         if (videoState->audio_buf_index >= videoState->audio_buf_size)
         {
             // we have already sent all avaialble data; get more
-            audio_size = audio_decode_frame(videoState, videoState->audio_buf, sizeof(videoState->audio_buf), &pts);
+            int audio_size = audio_decode_frame(
+                    videoState,
+                    videoState->audio_buf,
+                    sizeof(videoState->audio_buf),
+                    &pts
+            );
 
             // if error
             if (audio_size < 0)
@@ -902,13 +1176,16 @@ void audio_callback(void * userdata, Uint8 * stream, int len)
             }
             else
             {
-                videoState->audio_buf_size = audio_size;
+                audio_size = synchronize_audio(videoState, (int16_t *)videoState->audio_buf, audio_size);
+
+                // cast to usigned just to get rid of annoying warning messages
+                videoState->audio_buf_size = (unsigned)audio_size;
             }
 
             videoState->audio_buf_index = 0;
         }
 
-        len1 = videoState->audio_buf_size - videoState->audio_buf_index;
+        int len1 = videoState->audio_buf_size - videoState->audio_buf_index;
 
         if (len1 > len)
         {
@@ -920,6 +1197,8 @@ void audio_callback(void * userdata, Uint8 * stream, int len)
 
         len -= len1;
         stream += len1;
+
+        // update global VideoState audio buffer index
         videoState->audio_buf_index += len1;
     }
 }
@@ -991,8 +1270,8 @@ void alloc_picture(void * userdata)
             videoPicture->frame->linesize,
             buffer,
             AV_PIX_FMT_YUV420P,
-            videoState->video_ctx->width,
-            videoState->video_ctx->height,
+            videoState->window_width,
+            videoState->window_height,
             32
     );
 
@@ -1000,8 +1279,8 @@ void alloc_picture(void * userdata)
 //        SDL_UnlockMutex(screen_mutex);
 
     // update VideoPicture struct fields
-    videoPicture->width = videoState->video_ctx->width;
-    videoPicture->height = videoState->video_ctx->height;
+    videoPicture->width = videoState->window_width;
+    videoPicture->height = videoState->window_height;
     videoPicture->allocated = 1;
 }
 
@@ -1032,8 +1311,8 @@ int queue_picture(VideoState * videoState, AVFrame * pFrame, double pts)
 
     // if the VideoPicture SDL_Overlay is not allocated or has a different width/height
     if (!videoPicture->frame ||
-        videoPicture->width != videoState->video_ctx->width ||
-        videoPicture->height != videoState->video_ctx->height)
+        videoPicture->width != videoState->window_width ||
+        videoPicture->height != videoState->window_height)
     {
         // set SDL_Overlay not allocated
         videoPicture->allocated = 0;
@@ -1144,6 +1423,11 @@ static int64_t guess_correct_pts(AVCodecContext * ctx, int64_t reordered_pts, in
 
     return pts;
 }
+
+
+
+
+
 
 
 /**
@@ -1351,11 +1635,12 @@ int stream_component_open(VideoState * videoState, int stream_index)
         // desired and obtained audio specs references
         SDL_AudioSpec wanted_specs;
         SDL_AudioSpec specs;
+        SDL_memset(&wanted_specs, 0, sizeof(wanted_specs)); //initialize it with zeors
 
         // Set audio settings from codec info
-        wanted_specs.freq = codecCtx->sample_rate;
+        wanted_specs.freq = codecCtx->time_base.num;
         wanted_specs.format = AUDIO_S16SYS;
-        wanted_specs.channels = codecCtx->channels;
+        wanted_specs.channels = static_cast<Uint8>(codecCtx->channels);
         wanted_specs.silence = 0;
         wanted_specs.samples = SDL_AUDIO_BUFFER_SIZE;
         wanted_specs.callback = audio_callback;
@@ -1597,20 +1882,21 @@ int decode_thread(void * arg)
             break;
         }
 
-        // check audio and video packets queues size
-        if (videoState->audioq.size > MAX_AUDIOQ_SIZE || videoState->videoq.size > MAX_VIDEOQ_SIZE)
-        {
-            SDL_Delay(10);
-            continue;
-        }
+//        // check audio and video packets queues size
+//        if (videoState->audioq.size > MAX_AUDIOQ_SIZE || videoState->videoq.size > MAX_VIDEOQ_SIZE)
+//        {   printf("ERROR| AUDIO size is greater than MAX_SIZE with size_vid:%d size_aud:%d\n", videoState->videoq.size,videoState->audioq.size);
+//            SDL_Delay(10);
+//            continue;
+//        }
 
         // read data from the AVFormatContext by repeatedly calling av_read_frame()
         if (av_read_frame(videoState->pFormatCtx, packet) < 0)
         {
             if (videoState->pFormatCtx->pb->error == 0)
             {
+                printf("ERROR| wait for user input");
                 // no read error; wait for user input
-                SDL_Delay(100);
+                SDL_Delay(10);
 
                 continue;
             }
@@ -1781,50 +2067,20 @@ static Uint32 sdl_refresh_timer_cb(Uint32 interval, void * opaque)
  * timer, which will trigger an event, which will have our main() function in turn
  * call a function that pulls a frame from our picture queue and displays it.
  *
- * @param   videoState  global VideoState reference.
- *
- * @param   delay       the delay, expressed in milliseconds, before display the
- *                      next video frame on the screen.
+ * @param   videoState  the global VideoState reference.
+ * @param   delay       the delay, expressed in milliseconds, before displaying
+ *                      the next video frame on the screen.
  */
-static void schedule_refresh(VideoState * videoState, int delay)
+static void schedule_refresh(VideoState * videoState, Uint32 delay)
 {
-    SDL_AddTimer(delay, sdl_refresh_timer_cb, videoState);
-}
+    // schedule an SDL timer
+    int ret = SDL_AddTimer(delay, sdl_refresh_timer_cb, videoState);
 
-/**
- * Now we can finally implement our get_audio_clock function. It's not as simple
- * as getting the is->audio_clock value, thought. Notice that we set the audio
- * PTS every time we process it, but if you look at the audio_callback function,
- * it takes time to move all the data from our audio packet into our output
- * buffer. That means that the value in our audio clock could be too far ahead.
- * So we have to check how much we have left to write. Here's the complete code:
- *
- * @param   videoState
- *
- * @return
- */
-double get_audio_clock(VideoState * videoState)
-{
-
-    double pts = videoState->audio_clock;
-
-    int hw_buf_size = videoState->audio_buf_size - videoState->audio_buf_index;
-
-    int bytes_per_sec = 0;
-
-    int n = 2 * videoState->audio_ctx->channels;
-
-    if (videoState->audio_st)
+    // check the timer was correctly scheduled
+    if (ret == 0)
     {
-        bytes_per_sec = videoState->audio_ctx->sample_rate * n;
+        printf("Could not schedule refresh callback: %s.\n.", SDL_GetError());
     }
-
-    if (bytes_per_sec)
-    {
-        pts -= (double) hw_buf_size / bytes_per_sec;
-    }
-
-    return pts;
 }
 
 /**
@@ -1840,7 +2096,7 @@ void video_refresh_timer(void * userdata)
     // retrieve global VideoState reference
     VideoState * videoState = (VideoState *)userdata;
 
-    /* we will later see how to properly use this */
+    // VideoPicture read index reference
     VideoPicture * videoPicture;
 
     // used for video frames display delay and audio video sync
@@ -1863,13 +2119,17 @@ void video_refresh_timer(void * userdata)
             // get VideoPicture reference using the queue read index
             videoPicture = &videoState->pictq[videoState->pictq_rindex];
 
-            printf("Current Frame PTS:\t\t%f\n", videoPicture->pts);
-            printf("Last Frame PTS:\t\t\t%f\n", videoState->frame_last_pts);
+            if (_DEBUG_)
+            {
+                printf("Current Frame PTS:\t\t%f\n", videoPicture->pts);
+                printf("Last Frame PTS:\t\t\t%f\n", videoState->frame_last_pts);
+            }
 
             // get last frame pts
             pts_delay = videoPicture->pts - videoState->frame_last_pts;
 
-            printf("PTS Delay:\t\t\t\t%f\n", pts_delay);
+            if (_DEBUG_)
+                printf("PTS Delay:\t\t\t\t%f\n", pts_delay);
 
             // if the obtained delay is incorrect
             if (pts_delay <= 0 || pts_delay >= 1.0)
@@ -1878,58 +2138,71 @@ void video_refresh_timer(void * userdata)
                 pts_delay = videoState->frame_last_delay;
             }
 
-            printf("Corrected PTS Delay:\t%f\n", pts_delay);
+            if (_DEBUG_)
+                printf("Corrected PTS Delay:\t%f\n", pts_delay);
 
-            // Save delay information for the next time
+            // save delay information for the next time
             videoState->frame_last_delay = pts_delay;
             videoState->frame_last_pts = videoPicture->pts;
 
-            // update delay to stay in sync with the audio
-            audio_ref_clock = get_audio_clock(videoState);
-
-            printf("Audio Ref Clock:\t\t%f\n", audio_ref_clock);
-
-            audio_video_delay = videoPicture->pts - audio_ref_clock;
-
-            printf("Audio Video Delay:\t\t%f\n", audio_video_delay);
-
-            // skip or repeat the frame taking into account the delay
-            sync_threshold = (pts_delay > AV_SYNC_THRESHOLD) ? pts_delay : AV_SYNC_THRESHOLD;
-
-            printf("Sync Threshold:\t\t\t%f\n", sync_threshold);
-
-            // check audio video delay absolute value is below sync threshold
-            if (fabs(audio_video_delay) < AV_NOSYNC_THRESHOLD)
+            // in case the external clock is not used
+            if(videoState->av_sync_type != AV_SYNC_VIDEO_MASTER)
             {
-                if (audio_video_delay <= -sync_threshold)
+                // update delay to stay in sync with the master clock: audio or video
+                audio_ref_clock = get_master_clock(videoState);
+
+                if (_DEBUG_)
+                    printf("Ref Clock:\t\t%f\n", audio_ref_clock);
+
+                // calculate audio video delay accordingly to the master clock
+                audio_video_delay = videoPicture->pts - audio_ref_clock;
+
+                if (_DEBUG_)
+                    printf("Audio Video Delay:\t\t%f\n", audio_video_delay);
+
+                // skip or repeat the frame taking into account the delay
+                sync_threshold = (pts_delay > AV_SYNC_THRESHOLD) ? pts_delay : AV_SYNC_THRESHOLD;
+
+                if (_DEBUG_)
+                    printf("Sync Threshold:\t\t\t%f\n", sync_threshold);
+
+                // check audio video delay absolute value is below sync threshold
+                if(abs(audio_video_delay) < AV_NOSYNC_THRESHOLD)
                 {
-                    pts_delay = 0;
-                }
-                else if (audio_video_delay >= sync_threshold)
-                {
-                    pts_delay = 2 * pts_delay;  // [2]
+                    if(audio_video_delay <= -sync_threshold)
+                    {
+                        pts_delay = 0;
+                    }
+                    else if (audio_video_delay >= sync_threshold)
+                    {
+                        pts_delay = 2 * pts_delay;
+                    }
                 }
             }
 
-            printf("Corrected PTS delay:\t%f\n", pts_delay);
+            if (_DEBUG_)
+                printf("Corrected PTS delay:\t%f\n", pts_delay);
 
-            videoState->frame_timer += pts_delay;   // [2]
+            videoState->frame_timer += pts_delay;
 
             // compute the real delay
             real_delay = videoState->frame_timer - (av_gettime() / 1000000.0);
 
-            printf("Real Delay:\t\t\t\t%f\n", real_delay);
+            if (_DEBUG_)
+                printf("Real Delay:\t\t\t\t%f\n", real_delay);
 
             if (real_delay < 0.010)
             {
                 real_delay = 0.010;
             }
 
-            printf("Corrected Real Delay:\t%f\n", real_delay);
+            if (_DEBUG_)
+                printf("Corrected Real Delay:\t%f\n", real_delay);
 
-            schedule_refresh(videoState, (int)(real_delay * 1000 + 0.5));
+            schedule_refresh(videoState, (Uint32)(real_delay * 1000 + 0.5));
 
-            printf("Next Scheduled Refresh:\t%f\n\n", (double)(real_delay * 1000 + 0.5));
+            if (_DEBUG_)
+                printf("Next Scheduled Refresh:\t%f\n\n", (real_delay * 1000 + 0.5));
 
             // show the frame on the SDL_Surface (the screen)
             video_display(videoState);
@@ -1955,7 +2228,6 @@ void video_refresh_timer(void * userdata)
     }
     else
     {
-        schedule_refresh(videoState, 100);
+        schedule_refresh(videoState, 1);
     }
 }
-
