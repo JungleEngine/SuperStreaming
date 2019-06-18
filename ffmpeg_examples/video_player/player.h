@@ -45,13 +45,14 @@ using namespace std;
 /**
  * Maximum number of samples per channel in an audio frame.
  */
-#define MAX_AUDIO_FRAME_SIZE 19200000
+#define MAX_AUDIO_FRAME_SIZE 192000
 
 /**
  * Audio packets queue maximum size.
  */
 
-#define MAX_AUDIOQ_SIZE (5 * 16 * 1989119 * 30)
+#define MAX_AUDIOQ_SIZE (5 * 16 * 1024)
+#define MAX_VIDEOQ_SIZE (5 * 256 * 1024)
 
 /**
  * Video packets queue maximum size.
@@ -67,7 +68,7 @@ using namespace std;
 /**
  * No AV sync correction is done if the clock difference is below the minimum AV sync threshold.
  */
-#define AV_NOSYNC_THRESHOLD 1.0
+#define AV_NOSYNC_THRESHOLD 10.0
 
 /**
  *
@@ -94,7 +95,7 @@ using namespace std;
 /**
  * Video Frame queue size.
  */
-#define VIDEO_PICTURE_QUEUE_SIZE 1
+#define VIDEO_PICTURE_QUEUE_SIZE 3
 
 #define DEFAULT_AV_SYNC_TYPE AV_SYNC_AUDIO_MASTER
 
@@ -531,7 +532,7 @@ static int audio_resampling(
     arState->in_channel_layout = (videoState->audio_ctx->channels ==
                                   av_get_channel_layout_nb_channels(videoState->audio_ctx->channel_layout)) ?
                                  videoState->audio_ctx->channel_layout :
-                                 av_get_default_channel_layout(videoState->audio_ctx->channels);
+                                 static_cast<uint64_t>(av_get_default_channel_layout(videoState->audio_ctx->channels));
 
     // check input audio channels correctly retrieved
     if (arState->in_channel_layout <= 0)
@@ -539,7 +540,6 @@ static int audio_resampling(
         printf("in_channel_layout error.\n");
         return -1;
     }
-
     // set output audio channels based on the input audio channels
     if (videoState->audio_ctx->channels == 1)
     {
@@ -549,9 +549,14 @@ static int audio_resampling(
     {
         arState->out_channel_layout = AV_CH_LAYOUT_STEREO;
     }
-    else
+    else if (videoState->audio_ctx->channels == 4)
     {
-        arState->out_channel_layout = AV_CH_LAYOUT_SURROUND;
+        arState->out_channel_layout = AV_CH_LAYOUT_4POINT1;
+    }
+
+    else if (videoState->audio_ctx->channels == 6)
+    {
+        arState->out_channel_layout = AV_CH_LAYOUT_6POINT0;
     }
 
     // retrieve number of audio samples (per channel)
@@ -1636,12 +1641,13 @@ int stream_component_open(VideoState * videoState, int stream_index)
         SDL_AudioSpec wanted_specs;
         SDL_AudioSpec specs;
         SDL_memset(&wanted_specs, 0, sizeof(wanted_specs)); //initialize it with zeors
+        printf("video sample_rate:%d, timebase: num:%d den:%d", codecCtx->sample_rate, codecCtx->time_base.num,codecCtx->time_base.den);
 
         // Set audio settings from codec info
-        wanted_specs.freq = codecCtx->time_base.num;
+        wanted_specs.freq = codecCtx->sample_rate;
         wanted_specs.format = AUDIO_S16SYS;
         wanted_specs.channels = static_cast<Uint8>(codecCtx->channels);
-        wanted_specs.silence = 0;
+
         wanted_specs.samples = SDL_AUDIO_BUFFER_SIZE;
         wanted_specs.callback = audio_callback;
         wanted_specs.userdata = videoState;
@@ -1882,12 +1888,12 @@ int decode_thread(void * arg)
             break;
         }
 
-//        // check audio and video packets queues size
-//        if (videoState->audioq.size > MAX_AUDIOQ_SIZE || videoState->videoq.size > MAX_VIDEOQ_SIZE)
-//        {   printf("ERROR| AUDIO size is greater than MAX_SIZE with size_vid:%d size_aud:%d\n", videoState->videoq.size,videoState->audioq.size);
-//            SDL_Delay(10);
-//            continue;
-//        }
+        // check audio and video packets queues size
+        if (videoState->audioq.size > MAX_AUDIOQ_SIZE || videoState->videoq.size > MAX_VIDEOQ_SIZE)
+        {   printf("ERROR| AUDIO size is greater than MAX_SIZE with size_vid:%d size_aud:%d\n", videoState->videoq.size,videoState->audioq.size);
+            SDL_Delay(10);
+            continue;
+        }
 
         // read data from the AVFormatContext by repeatedly calling av_read_frame()
         if (av_read_frame(videoState->pFormatCtx, packet) < 0)
@@ -2183,7 +2189,7 @@ void video_refresh_timer(void * userdata)
             if (_DEBUG_)
                 printf("Corrected PTS delay:\t%f\n", pts_delay);
 
-            videoState->frame_timer += pts_delay;
+            videoState->frame_timer += pts_delay ;
 
             // compute the real delay
             real_delay = videoState->frame_timer - (av_gettime() / 1000000.0);

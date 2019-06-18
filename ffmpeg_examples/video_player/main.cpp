@@ -28,7 +28,7 @@ int main()
     // copy the file name input by the user to the VideoState structure
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
-    videoState->filename = "rtsp://127.0.1.1:8554/baz.mkv";
+    videoState->filename = "rtsp://127.0.1.1:8554/GOT.mkv";
     // parse max frames to decode input by the user
     char * pEnd;
     videoState->maxFramesToDecode =100000000000000;
@@ -36,7 +36,7 @@ int main()
     // initialize locks for the display buffer (pictq)
     videoState->pictq_mutex = SDL_CreateMutex();
     videoState->pictq_cond = SDL_CreateCond();
-    create_window(videoState, "SuperStreaming|TV", 1920, 1080);
+    create_window(videoState, "SuperStreaming|TV", 500, 500);
 
     // launch our threads by pushing an SDL_event of type FF_REFRESH_EVENT
     schedule_refresh(videoState, 1);
