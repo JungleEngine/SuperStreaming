@@ -13,7 +13,6 @@ find_library(AVUTIL_LIBRARY avutil)
 find_path(AVRESAMPLE_INCLUDE_DIR libavresample/avresample.h)
 find_library(AVRESAMPLE_LIBRARY avresample)
 
-find_path(SDL_IMAGE_INCLUDE_DIR SDL_image.h)
 find_library(SDL_IMAGE_LIBRARY avresample)
 
 find_path(LIBSWSCALE_INCLUDE_DIRS libswscale/swscale.h)
