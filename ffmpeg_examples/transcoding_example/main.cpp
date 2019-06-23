@@ -91,7 +91,7 @@ static int open_input_file(const char *filename)
 }
 
 
-static int open_output_file(const char *filename)
+static int open_output_file(const char *filename, const char * preset = "24")
 {
     AVStream *out_stream;
     AVStream *in_stream;
@@ -152,7 +152,8 @@ static int open_output_file(const char *filename)
 
                 enc_ctx->time_base = in_stream->time_base;
 
-              //  av_opt_set( enc_ctx->priv_data, "preset", "veryslow", 0 );
+              av_opt_set( enc_ctx->priv_data, "crf", preset, 0 );
+              av_opt_set( enc_ctx->priv_data, "preset", "veryslow", 0 );
 
             } else {
                 enc_ctx->sample_rate = dec_ctx->sample_rate;
@@ -271,15 +272,23 @@ int main(int argc, char **argv)
     int ret;
     AVPacket* packet = av_packet_alloc();
     AVFrame* frame = nullptr;
+    AVFrame* prev_frame = nullptr;
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/4_out.mp4");
+    ret = open_input_file("in.mp4");
     if(ret < 0){
         printf("couldn't open input file\n");
         exit(1);
     }
-    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/4_out_even.mp4");
+    const char * preset = "";
+    const char * out_file = "out.mp4";
+    if(argc > 1)
+        preset = argv[1];
+    if(argc > 2)
+        out_file = argv[2];
+
+    ret = open_output_file(out_file, preset);
     if(ret < 0){
         printf("couldn't open output file\n");
         exit(1);
@@ -311,6 +320,7 @@ int main(int argc, char **argv)
             }else{
                 // Decode.
                 while (ret >= 0) {
+                    frame = av_frame_alloc();
                     ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
                     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                         break;
@@ -320,15 +330,59 @@ int main(int argc, char **argv)
                     }
 
                     printf("received_frames:%d ",received_frames);
-                    if(should_skip_frame++%2 == 1){
-                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
-                        av_frame_free(&frame);
-                        break;
+                    if(prev_frame!=nullptr){
+                        AVFrame *interpolated_frame = av_frame_clone( frame);
+//                        if (ret_code < 0) {
+//                            printf("error in copying frame");
+//                            exit(1);
+//                        }
+                        for(int y = 0 ;y<frame->height;++y) {
+                            for (int x = 0; x < frame->width; ++x) {
+                                interpolated_frame->data[0][y * frame->linesize[0] + x] =
+                                        (frame->data[0][y * frame->linesize[0] + x] +
+                                         prev_frame->data[0][y * frame->linesize[0] + x]) / 2;
+                            }
+                        }
+                        for(int y = 0;y<frame->height/2;++y){
+                            for(int x = 0;x<frame->width/2;++x){
+                                interpolated_frame->data[1][y*frame->linesize[1]+x] =
+                                        (frame->data[1][y*frame->linesize[1]+x] + prev_frame->data[1][y*frame->linesize[1]+x])/2;
+
+                                interpolated_frame->data[2][y*frame->linesize[2]+x] =
+                                        (frame->data[2][y*frame->linesize[2]+x] + prev_frame->data[2][y*frame->linesize[2]+x])/2;
+                            }
+                        }
+                        interpolated_frame->pts = (frame->pts + prev_frame->pts)/2;
+                        printf("\n********\n");
+                        printf("%d\n",prev_frame->pts);
+                        printf("%d\n",interpolated_frame->pts);
+                        printf("%d\n",frame->pts);
+                        printf("--------\n");
+                        interpolated_frame->pkt_dts = (frame->pkt_dts + prev_frame->pkt_dts)/2;
+                        received_frames++;
+                        printf("interpolated frame!\n");
+                        printf("#frames:%d \n", received_frames-1);
+                        ret = encode_write_frame(interpolated_frame, stream_index);
+                        if (ret < 0){
+                            printf("badddd\n");
+                            exit(1);
+                        }
                     }
+//                    frame->pts++;
+//                    frame->pkt_dts++;
+//                    if(should_skip_frame++%2 == 1){
+//                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
+//                        av_frame_free(&frame);
+//                        break;
+//                    }
                     received_frames++;
                     printf("#frames:%d \n", received_frames-1);
                     ret = encode_write_frame(frame, stream_index);
-                    av_frame_free(&frame);
+                    if(prev_frame!=nullptr) {
+                        av_frame_free(&prev_frame);
+                    }
+                    prev_frame = frame;
+
                     if (ret < 0){
                         printf("badddd\n");
                         exit(1);
