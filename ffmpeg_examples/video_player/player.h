@@ -189,6 +189,8 @@ public:
     double              audio_diff_avg_coef;
     double              audio_diff_threshold;
     int                 audio_diff_avg_count;
+    AVFrame *            prev_frame=nullptr;
+
 
     VideoPicture        pictq[VIDEO_PICTURE_QUEUE_SIZE];
     int                 pictq_size;
@@ -1573,12 +1575,46 @@ int video_thread(void * arg)
             // did we get an entire video frame?
             if (frameFinished)
             {
-                pts = synchronize_video(videoState, pFrame, pts);
+                AVFrame * interpolated_frame = av_frame_clone(pFrame);
 
+                if(videoState->prev_frame != nullptr){
+                    for(int y = 0 ;y<pFrame->height;++y) {
+                        for (int x = 0; x < pFrame->width; ++x) {
+                            interpolated_frame->data[0][y * pFrame->linesize[0] + x] =
+                                    (pFrame->data[0][y * pFrame->linesize[0] + x] +
+                                            videoState->prev_frame->data[0][y * pFrame->linesize[0] + x]) / 2;
+                            if(abs(interpolated_frame->data[0][y * pFrame->linesize[0] + x] - pFrame->data[0][y * pFrame->linesize[0] + x] ) > 3){
+                               printf("kkkkk\n");
+                            }
+                            if(x<pFrame->width/2 && y< pFrame->height/2){
+                                interpolated_frame->data[1][y*pFrame->linesize[1]+x] =
+                                        (pFrame->data[1][y*pFrame->linesize[1]+x] + videoState->prev_frame->data[1][y*pFrame->linesize[1]+x])/2;
+
+                                interpolated_frame->data[2][y*pFrame->linesize[2]+x] =
+                                        (pFrame->data[2][y*pFrame->linesize[2]+x] + videoState->prev_frame->data[2][y*pFrame->linesize[2]+x])/2;
+                            }
+                        }
+                    }
+                    interpolated_frame->pts = (pFrame->pts + videoState->prev_frame->pts)/2;
+                    pts = synchronize_video(videoState, interpolated_frame, interpolated_frame->pts);
+                    printf("\n********\n");
+                    printf("%d\n",videoState->prev_frame->pts);
+                    printf("%d\n",interpolated_frame->pts);
+                    printf("%d\n",pFrame->pts);
+                    printf("--------\n");
+                    interpolated_frame->pkt_dts = (pFrame->pkt_dts + videoState->prev_frame->pkt_dts)/2;
+                    printf("interpolated frame!\n");
+                    if(queue_picture(videoState, interpolated_frame, interpolated_frame->pts) < 0)
+                    {
+                        break;
+                    }
+                }
+                pts = synchronize_video(videoState, pFrame, pts);
                 if(queue_picture(videoState, pFrame, pts) < 0)
                 {
                     break;
                 }
+                videoState->prev_frame = pFrame;
             }
         }
 
