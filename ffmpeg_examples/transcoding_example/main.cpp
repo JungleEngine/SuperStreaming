@@ -341,17 +341,24 @@ int main(int argc, char **argv)
                                 interpolated_frame->data[0][y * frame->linesize[0] + x] =
                                         (frame->data[0][y * frame->linesize[0] + x] +
                                          prev_frame->data[0][y * frame->linesize[0] + x]) / 2;
-                            }
-                        }
-                        for(int y = 0;y<frame->height/2;++y){
-                            for(int x = 0;x<frame->width/2;++x){
-                                interpolated_frame->data[1][y*frame->linesize[1]+x] =
-                                        (frame->data[1][y*frame->linesize[1]+x] + prev_frame->data[1][y*frame->linesize[1]+x])/2;
+                                if(x<frame->width/2 && y< frame->height/2){
+                                    interpolated_frame->data[1][y*frame->linesize[1]+x] =
+                                            (frame->data[1][y*frame->linesize[1]+x] + prev_frame->data[1][y*frame->linesize[1]+x])/2;
 
-                                interpolated_frame->data[2][y*frame->linesize[2]+x] =
-                                        (frame->data[2][y*frame->linesize[2]+x] + prev_frame->data[2][y*frame->linesize[2]+x])/2;
+                                    interpolated_frame->data[2][y*frame->linesize[2]+x] =
+                                            (frame->data[2][y*frame->linesize[2]+x] + prev_frame->data[2][y*frame->linesize[2]+x])/2;
+                                }
                             }
                         }
+//                        for(int y = 0;y<frame->height/2;++y){
+//                            for(int x = 0;x<frame->width/2;++x){
+//                                interpolated_frame->data[1][y*frame->linesize[1]+x] =
+//                                        (frame->data[1][y*frame->linesize[1]+x] + prev_frame->data[1][y*frame->linesize[1]+x])/2;
+//
+//                                interpolated_frame->data[2][y*frame->linesize[2]+x] =
+//                                        (frame->data[2][y*frame->linesize[2]+x] + prev_frame->data[2][y*frame->linesize[2]+x])/2;
+//                            }
+//                        }
                         interpolated_frame->pts = (frame->pts + prev_frame->pts)/2;
                         printf("\n********\n");
                         printf("%d\n",prev_frame->pts);
