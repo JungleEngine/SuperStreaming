@@ -1,5 +1,6 @@
 #include <algorithm>
-extern "C"{
+
+extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/timestamp.h>
 #include <libavutil/opt.h>
@@ -7,6 +8,9 @@ extern "C"{
 
 #define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE), AV_ERROR_MAX_STRING_SIZE, errnum)
 #define av_ts2str(ts) av_ts_make_string((char*)__builtin_alloca(AV_TS_MAX_STRING_SIZE), ts)
+
+
+int pts_cnt = 0;
 
 int received_frames = 0;
 int written_packets_count = 0;
@@ -61,7 +65,6 @@ static int open_input_file(const char *filename)
             av_log(NULL, AV_LOG_ERROR, "Failed to allocate the decoder context for stream #%u\n", i);
             return AVERROR(ENOMEM);
         }
-
         ret = avcodec_parameters_to_context(codec_ctx, stream->codecpar);
         if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "Failed to copy decoder parameters to input decoder context "
@@ -73,11 +76,8 @@ static int open_input_file(const char *filename)
             || codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
             if (codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
                 codec_ctx->framerate = av_guess_frame_rate(ifmt_ctx, stream, NULL);
-
-                printf("time base %d /%d \n",codec_ctx->time_base.num, codec_ctx->time_base.den);
-
             /* Open decoder */
-            ret = avcodec_open2(codec_ctx,  dec, NULL);
+            ret = avcodec_open2(codec_ctx, dec, NULL);
             if (ret < 0) {
                 av_log(NULL, AV_LOG_ERROR, "Failed to open decoder for stream #%u\n", i);
                 return ret;
@@ -144,15 +144,11 @@ static int open_output_file(const char *filename)
                     enc_ctx->pix_fmt = encoder->pix_fmts[0];
                 else
                     enc_ctx->pix_fmt = dec_ctx->pix_fmt;
-
-                /* Video time_base can be set to whatever is handy and supported by encoder
-                 * Remember fra
-                 *
-                 * */
-
+                /* video time_base can be set to whatever is handy and supported by encoder */
                 enc_ctx->time_base = in_stream->time_base;
+                av_opt_set( enc_ctx->priv_data, "profile", "baseline", 0 );
+                av_opt_set( enc_ctx->priv_data, "crf", "18", 0 );
 
-              //  av_opt_set( enc_ctx->priv_data, "preset", "veryslow", 0 );
 
             } else {
                 enc_ctx->sample_rate = dec_ctx->sample_rate;
@@ -165,7 +161,6 @@ static int open_output_file(const char *filename)
 
             if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
                 enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-
 
             /* Third parameter can be used to pass settings to encoder */
             ret = avcodec_open2(enc_ctx, encoder, NULL);
@@ -191,7 +186,7 @@ static int open_output_file(const char *filename)
                 av_log(NULL, AV_LOG_ERROR, "Copying parameters for stream #%u failed\n", i);
                 return ret;
             }
-            out_stream->time_base = dec_ctx->time_base;
+            out_stream->time_base = in_stream->time_base;
         }
 
     }
@@ -205,7 +200,6 @@ static int open_output_file(const char *filename)
         }
     }
 
-
     /* init muxer, write output file header */
     ret = avformat_write_header(ofmt_ctx, NULL);
     if (ret < 0) {
@@ -217,10 +211,8 @@ static int open_output_file(const char *filename)
 }
 
 
-
 static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
     int ret;
-    int got_frame_local;
     AVPacket enc_pkt;
 
 
@@ -234,25 +226,22 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
     //av_frame_free(&filt_frame);
     if (ret < 0)
         return ret;
+    enc_pkt.size = 0;
 
-    while((ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt) >= 0)){
+    while ((ret = avcodec_receive_packet(stream_ctx[stream_index].enc_ctx, &enc_pkt) >= 0)) {
         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
             printf("something strange:%s \n", av_err2str(ret));
             return ret;
         }
 
         enc_pkt.stream_index = stream_index;
-        printf("encoding:before adjust ts:%s\n", av_ts2str(enc_pkt.pts));
 
-        av_packet_rescale_ts(&enc_pkt,
-                             stream_ctx[stream_index].dec_ctx->time_base,
-                             ofmt_ctx->streams[stream_index]->time_base);
-        printf("encoding:after adjust ts:%s\n", av_ts2str(enc_pkt.pts));
+        printf("timestamp_after:%li\n", enc_pkt.pts);
 
-        av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
-        printf("Writing packet with size:%d  number:%d \n", enc_pkt.size, ++written_packets_count);
+        //av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
+       // printf("Writing packet with size:%d  number:%d \n", enc_pkt.size, ++written_packets_count);
         largest_packet_size = std::max(enc_pkt.size, largest_packet_size);
-        if(first_packet_size == 0){
+        if (first_packet_size == 0) {
             first_packet_size = enc_pkt.size;
         }
         ret = av_interleaved_write_frame(ofmt_ctx, &enc_pkt);
@@ -264,72 +253,86 @@ static int encode_write_frame(AVFrame *filt_frame, int stream_index) {
 }
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     // Initialize libav.
     av_register_all();
     int ret;
-    AVPacket* packet = av_packet_alloc();
-    AVFrame* frame = nullptr;
+    AVPacket *packet = av_packet_alloc();
+    AVFrame *frame = nullptr;
     int stream_index;
     enum AVMediaType type;
 
-    ret = open_input_file("/media/syrix/programms/projects/GP/test_frames/4_out.mp4");
-    if(ret < 0){
+    ret = open_input_file(
+            "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/transcoding_example/baz.mkv");
+
+    if (ret < 0) {
         printf("couldn't open input file\n");
         exit(1);
     }
-    ret = open_output_file("/media/syrix/programms/projects/GP/test_frames/4_out_even.mp4");
-    if(ret < 0){
+
+    ret = open_output_file(
+            "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/transcoding_example/baz100.mkv");
+
+    if (ret < 0) {
         printf("couldn't open output file\n");
         exit(1);
     }
     // Read all packets.
-    while(true){
+    while (true) {
         frame = av_frame_alloc();
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
 //        packet->duration = 0;
-        if(first_packet_size_read == 0)
-        first_packet_size_read = packet->size;
+        if (first_packet_size_read == 0)
+            first_packet_size_read = packet->size;
         stream_index = packet->stream_index;
         type = ifmt_ctx->streams[packet->stream_index]->codecpar->codec_type;
         av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
                stream_index);
 
-        av_packet_rescale_ts(packet,
-                             ifmt_ctx->streams[stream_index]->time_base,
-                             stream_ctx[stream_index].dec_ctx->time_base);
 
-        if(type == AVMEDIA_TYPE_VIDEO){
+
+
+
+        if (type == AVMEDIA_TYPE_VIDEO) {
+
+
             largest_input_packet_size = std::max(largest_input_packet_size, packet->size);
             ret = avcodec_send_packet(stream_ctx[stream_index].dec_ctx, packet);
             if (ret < 0) {
                 av_frame_free(&frame);
                 av_log(NULL, AV_LOG_ERROR, "Decoding failed\n");
                 break;
-            }else{
+            } else {
                 // Decode.
                 while (ret >= 0) {
                     ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
+
+
+
                     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                         break;
                     else if (ret < 0) {
                         fprintf(stderr, "Error during decoding\n");
                         exit(1);
                     }
-
-                    printf("received_frames:%d ",received_frames);
-                    if(should_skip_frame++%2 == 1){
-                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
+//                    printf("received_frames:%d ", received_frames);
+                    if (should_skip_frame++ % 2 == 1 && false) {
+//                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
                         av_frame_free(&frame);
                         break;
                     }
                     received_frames++;
-                    printf("#frames:%d \n", received_frames-1);
+                    //printf("#frames:%d \n", received_frames - 1);
+                    frame->pts = frame->best_effort_timestamp;
+
+//                    frame->pts =pts_cnt;
+//                    pts_cnt += 2;
+
+                    printf("frame_pts:%li\n", frame->pts);
                     ret = encode_write_frame(frame, stream_index);
                     av_frame_free(&frame);
-                    if (ret < 0){
+                    if (ret < 0) {
                         printf("badddd\n");
                         exit(1);
                     }
@@ -337,7 +340,15 @@ int main(int argc, char **argv)
 
             }
 
+        } else if (type == AVMEDIA_TYPE_AUDIO) {
+            ret = av_interleaved_write_frame(ofmt_ctx, packet);
+            av_packet_unref(packet);
+
+        } else {
+            printf("Unkown stream\n");
+            exit(1);
         }
+
     }
 
     av_write_trailer(ofmt_ctx);
@@ -354,11 +365,12 @@ int main(int argc, char **argv)
         avio_closep(&ofmt_ctx->pb);
     avformat_free_context(ofmt_ctx);
 
-        if (ret < 0)
-            av_log(NULL, AV_LOG_ERROR, "Error occurred: %s\n", av_err2str(ret));
+    if (ret < 0)
+        av_log(NULL, AV_LOG_ERROR, "Error occurred: %s\n", av_err2str(ret));
 
-    printf("Largest written_packet_size:%d largest read_packet_size:%d ,"
-                   "total_written_frames_count:%d total_skipped_frames:%d \n", largest_packet_size, largest_input_packet_size,
+    printf("Largest written_packet_size:%d| largest read_packet_size:%d ,"
+                   "total_written_frames_count:%d| total_skipped_frames:%d| \n", largest_packet_size,
+           largest_input_packet_size,
            received_frames, skipped_frames);
 
     printf(" First written_packet_size:%d  first_read_packet_size:%d\n", first_packet_size_read, first_packet_size);
