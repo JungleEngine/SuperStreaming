@@ -91,7 +91,7 @@ static int open_input_file(const char *filename)
 }
 
 
-static int open_output_file(const char *filename)
+static int open_output_file(const char *filename, const char * preset = "24")
 {
     AVStream *out_stream;
     AVStream *in_stream;
@@ -306,6 +306,7 @@ int main(int argc, char **argv) {
             } else {
                 // Decode.
                 while (ret >= 0) {
+                    frame = av_frame_alloc();
                     ret = avcodec_receive_frame(stream_ctx[stream_index].dec_ctx, frame);
 
 
@@ -322,6 +323,13 @@ int main(int argc, char **argv) {
                         av_frame_free(&frame);
                         break;
                     }
+//                    frame->pts++;
+//                    frame->pkt_dts++;
+//                    if(should_skip_frame++%2 == 1){
+//                        printf("Skipped_frame_number:%d \n", ++skipped_frames);
+//                        av_frame_free(&frame);
+//                        break;
+//                    }
                     received_frames++;
                     //printf("#frames:%d \n", received_frames - 1);
                     frame->pts = frame->best_effort_timestamp;
@@ -333,6 +341,7 @@ int main(int argc, char **argv) {
                     ret = encode_write_frame(frame, stream_index);
                     av_frame_free(&frame);
                     if (ret < 0) {
+
                         printf("badddd\n");
                         exit(1);
                     }
