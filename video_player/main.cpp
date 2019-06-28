@@ -28,11 +28,9 @@ int main()
     // copy the file name input by the user to the VideoState structure
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
-//    videoState->filename = "rtsp://127.0.1.1:8554/GOT.mkv";
-    videoState->filename = "input.mp4";
+    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv";
     // parse max frames to decode input by the user
     char * pEnd;
-    videoState->maxFramesToDecode =100000000000000;
 
     // initialize locks for the display buffer (pictq)
     videoState->pictq_mutex = SDL_CreateMutex();
