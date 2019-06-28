@@ -19,3 +19,5 @@ cmake-build-*/
 *.pyc
 *.pcy
 *.ali
+*.mkv
+*.mp4
