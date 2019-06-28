@@ -18,14 +18,14 @@ extern "C" {
 
 class VideoContext {
 private:
+    std::mutex mutex_;
     std::unique_ptr<PacketQueue> packet_queue_;
     std::unique_ptr<FrameQueue> frame_queue_;
-
-    std::unique_ptr<PacketQueue> packets_to_write_queue_;
+    std::unique_ptr<FrameQueue> processed_frame_queue_;
 
     std::vector<std::thread> stages_;
     std::exception_ptr exception_{};
-
+    int t =0;
 
 public:
     AVCodecContext *video_dec_cntx;
@@ -58,14 +58,26 @@ public:
 
     void demultiplex();
     void decode();
+    void processFrames();
+    void encode();
+
+
+    int writeHeader();
+    int writePacket();
 
 //    int decodeFrames();
-
 
     void close_input_file();
     void close_output_file();
 
 
+    bool sendPacketToDecoder(AVPacket *packet);
+
+    bool receiveFrameFromDecoder(AVFrame *frame);
+
+    bool sendFrameToEncoder(AVFrame *frame);
+
+    bool receivePacketFromEncoder(AVPacket *packet);
 };
 
 
