@@ -9,5 +9,7 @@ int main(int argc, char **argv)
 
 
     video_cntx->runSkipping();
+    video_cntx->close_input_file();
+    video_cntx->close_output_file();
 
 }

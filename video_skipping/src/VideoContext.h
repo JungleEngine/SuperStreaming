@@ -78,6 +78,8 @@ public:
     bool sendFrameToEncoder(AVFrame *frame);
 
     bool receivePacketFromEncoder(AVPacket *packet);
+
+    int writePacket(AVPacket *);
 };
 
 

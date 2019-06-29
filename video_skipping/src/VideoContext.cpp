@@ -71,13 +71,15 @@ int VideoContext::openOutputFile() {
 
         if (in_codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
             this->video_stream_indx = i;
+
+
         } else if (in_codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
             this->audio_stream_indx = i;
-            ret = avcodec_parameters_copy(out_stream->codecpar, in_codecpar);
-            if (ret < 0) {
-                fprintf(stderr, "Failed to copy codec parameters\n");
-                exit(1);
-            }
+//            ret = avcodec_parameters_copy(out_stream->codecpar, in_codecpar);
+//            if (ret < 0) {
+//                fprintf(stderr, "Failed to copy codec parameters\n");
+//                exit(1);
+//            }
 //            out_stream->codecpar->codec_tag = 0;
         } else {
             printf("Unkown stream, not video and not audio, exit.\n");
@@ -88,13 +90,7 @@ int VideoContext::openOutputFile() {
 
     }
 
-    if (!(ofmt->flags & AVFMT_NOFILE)) {
-        ret = avio_open(&this->ofmt_ctx->pb, this->output_filename.c_str(), AVIO_FLAG_WRITE);
-        if (ret < 0) {
-            fprintf(stderr, "Could not open output file '%s'", this->output_filename);
-            return -1;
-        }
-    }
+
 
 
 }
@@ -107,7 +103,8 @@ void VideoContext::close_input_file() {
 
 
 void VideoContext::close_output_file() {
-    if (this->ofmt_ctx && !(this->ofmt->flags & AVFMT_NOFILE))
+        av_write_trailer(ofmt_ctx);
+    if (this->ofmt_ctx && !(this->ofmt_ctx->oformat->flags & AVFMT_NOFILE))
         avio_closep(&this->ofmt_ctx->pb);
     avformat_free_context(this->ofmt_ctx);
 
@@ -228,6 +225,7 @@ int VideoContext::getEncoderCntx() {
         av_log(nullptr, AV_LOG_FATAL, "Failed to allocate the encoder context\n");
         return AVERROR(ENOMEM);
     }
+
     this->audio_enc_cntx->sample_rate = this->audio_dec_cntx->sample_rate;
     this->audio_enc_cntx->channel_layout = this->audio_dec_cntx->channel_layout;
     this->audio_enc_cntx->channels = av_get_channel_layout_nb_channels(this->audio_enc_cntx->channel_layout);
@@ -258,6 +256,18 @@ int VideoContext::getEncoderCntx() {
 
 int VideoContext::writeHeader() {
     int ret;
+//    this->ofmt_ctx->duration = this->ifmt_ctx->duration;
+
+
+    if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE)) {
+        ret = avio_open(&ofmt_ctx->pb, this->output_filename.c_str(), AVIO_FLAG_WRITE);
+        if (ret < 0) {
+            av_log(NULL, AV_LOG_ERROR, "Could not open output file '%s'", this->output_filename.c_str());
+            return ret;
+        }
+    }
+
+
     // Now writing header of file after settings ofmt_ctx parameters.
     ret = avformat_write_header(this->ofmt_ctx, nullptr);
     if (ret < 0) {
@@ -272,28 +282,28 @@ int VideoContext::writeHeader() {
 
 bool VideoContext::sendPacketToDecoder(AVPacket *packet) {
     auto ret = avcodec_send_packet(this->video_dec_cntx, packet);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF);
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
 
 }
 
 
 bool VideoContext::receiveFrameFromDecoder(AVFrame *frame) {
     auto ret = avcodec_receive_frame(this->video_dec_cntx, frame);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF);
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
 
 }
 
 
 bool VideoContext::sendFrameToEncoder(AVFrame *frame) {
     auto ret = avcodec_send_frame(this->video_enc_cntx, frame);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF);
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
 
 }
 
 
 bool VideoContext::receivePacketFromEncoder(AVPacket *packet) {
     auto ret = avcodec_receive_packet(this->video_enc_cntx, packet);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF);
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
 
 }
 
@@ -328,7 +338,7 @@ void VideoContext::demultiplex() {
                     }};
 
             av_init_packet(packet.get());
-            packet->data = nullptr;
+//            packet->data = nullptr;
 
             // Read frame into AVPacket
             if ((av_read_frame(this->ifmt_ctx, packet.get())) < 0) {
@@ -372,12 +382,14 @@ void VideoContext::decode() {
             printf("to be decoded audio packet of type:%i|pts:%li\n", packet->stream_index, packet->pts);
 
             // Audio packets should be written directly into output file.
-//            if (packet->stream_index == this->audio_stream_indx) {
-//                if (av_interleaved_write_frame(this->ofmt_ctx, packet.get()) < 0) {
-//                    printf("error while writing audio packet into output file\n");
-//                }
-//                continue;
-//            }
+            if (packet->stream_index == this->audio_stream_indx) {
+                ;
+                if (this->writePacket(packet.get()) < 0) {
+                    printf("error while writing audio packet into output file\n");
+                    break;
+                }
+                continue;
+            }
 
             // Video packets should be decoded first.
             // This check maybe redundant for now.
@@ -467,7 +479,7 @@ void VideoContext::encode() {
                 if (!this->receivePacketFromEncoder(packet.get()))
                     break;
 //                packet->stream_index = this->video_stream_indx;
-                if (av_interleaved_write_frame(this->ofmt_ctx, packet.get()) < 0) {
+                if (this->writePacket(packet.get()) < 0) {
                     printf("error while writing video packet into output file\n");
                     break;
                 }
@@ -484,8 +496,10 @@ void VideoContext::encode() {
 }
 
 
-int VideoContext::writePacket() {
-    return 0;
+int VideoContext::writePacket(AVPacket* packet) {
+    std::unique_lock<std::mutex> lock(this->mutex_);
+    return av_interleaved_write_frame(this->ofmt_ctx, packet);
+
 }
 
 
