@@ -379,7 +379,7 @@ void VideoContext::decode() {
                 break;
             }
 
-            printf("to be decoded audio packet of type:%i|pts:%li\n", packet->stream_index, packet->pts);
+//            printf("to be decoded audio packet of type:%i|pts:%li\n", packet->stream_index, packet->pts);
 
             // Audio packets should be written directly into output file.
             if (packet->stream_index == this->audio_stream_indx) {
@@ -410,8 +410,15 @@ void VideoContext::decode() {
                     if (!this->receiveFrameFromDecoder(frame_decoded.get()))
                         break;
 
+                    if(frame_decoded->interpolated_frame != nullptr)
+                    {
+                        printf("found interpolated.\n");
+                    }else{
+                        printf("NULL interpolated\n");
+                    }
 
-                    printf("received video frame from decoder with pts:%li\n", frame_decoded->pts);
+
+//                    printf("received video frame from decoder with pts:%li\n", frame_decoded->pts);
                     if (!frame_queue_->push(move(frame_decoded))) {
                         break;
                     }
