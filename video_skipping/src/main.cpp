@@ -3,8 +3,8 @@
 int main(int argc, char **argv)
 {
 
-    std::string input_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz.mkv";
-    std::string output_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz2.mkv";
+    std::string input_filename = "youtube.mp4";
+    std::string output_filename = "out.mp4";
     VideoContext* video_cntx = new VideoContext(input_filename, output_filename);
 
 

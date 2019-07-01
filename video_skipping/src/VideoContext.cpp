@@ -31,7 +31,7 @@ int VideoContext::openInputFile() {
     this->ifmt_ctx = nullptr;
     if ((avformat_open_input(&this->ifmt_ctx, this->input_filename.c_str(), nullptr, nullptr)) < 0) {
 
-        fprintf(stderr, "Could not open input file '%s'", this->input_filename);
+        fprintf(stderr, "Could not open input file '%s'", this->input_filename.c_str());
         return -1;
     }
 
@@ -41,6 +41,7 @@ int VideoContext::openInputFile() {
     }
 
     av_dump_format(this->ifmt_ctx, 0, this->input_filename.c_str(), 0);
+    return 0;
 }
 
 int VideoContext::openOutputFile() {
@@ -91,7 +92,7 @@ int VideoContext::openOutputFile() {
     }
 
 
-
+    return 0;
 
 }
 
@@ -288,6 +289,9 @@ bool VideoContext::sendPacketToDecoder(AVPacket *packet) {
 
 
 bool VideoContext::receiveFrameFromDecoder(AVFrame *frame) {
+    if(frame == nullptr){
+        frame = av_frame_alloc();
+    }
     auto ret = avcodec_receive_frame(this->video_dec_cntx, frame);
     return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
 
