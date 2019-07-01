@@ -21,7 +21,9 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 add_executable(video_skipping src/main.cpp src/VideoContext.h src/VideoContext.cpp src/VideoFrame.h src/VideoFrame.cpp src/queue.h)
-target_include_directories(video_skipping PRIVATE ${AVCODEC_INCLUDE_DIR} ${AVFORMAT_INCLUDE_DIR} ${AVUTIL_INCLUDE_DIR}
-        ${AVRESAMPLE_INCLUDE_DIR} ${LIBSWSCALE_INCLUDE_DIRS})
-target_link_libraries(video_skipping PRIVATE ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY} ${AVUTIL_LIBRARY} ${AVRESAMPLE_LIBRARY}
-        ${SWSCALE_LIBRARY} Threads::Threads)
+#target_include_directories(video_skipping PRIVATE ${AVCODEC_INCLUDE_DIR} ${AVFORMAT_INCLUDE_DIR} ${AVUTIL_INCLUDE_DIR}
+#        ${AVRESAMPLE_INCLUDE_DIR} ${LIBSWSCALE_INCLUDE_DIRS})
+#target_link_libraries(video_skipping PRIVATE ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY} ${AVUTIL_LIBRARY} ${AVRESAMPLE_LIBRARY}
+#        ${SWSCALE_LIBRARY} Threads::Threads)
+target_link_libraries(video_skipping PRIVATE -lavcodec -lavformat -lavutil -lavresample
+        -lswscale Threads::Threads)

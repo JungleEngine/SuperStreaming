@@ -405,6 +405,9 @@ void VideoContext::decode() {
             while (!sent) {
                 sent = this->sendPacketToDecoder(packet.get());
                 while (this->receiveFrameFromDecoder(frame_decoded.get())) {
+                    if(frame_decoded->interpolated_frame!= nullptr){
+                        printf("found!! \n");
+                    }
                     printf("received video frame from decoder with pts:%li\n", frame_decoded->pts);
                     if (!frame_queue_->push(move(frame_decoded))) {
                         break;
