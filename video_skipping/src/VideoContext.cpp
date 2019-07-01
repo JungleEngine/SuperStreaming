@@ -10,7 +10,7 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
         processed_frame_queue_{std::make_unique<FrameQueue>(10)} {
 
     // Required for ffmpeg init.
-    av_register_all();
+//    av_register_all();
 
     this->input_filename = input_filename;
     this->output_filename = output_filename;
@@ -362,10 +362,6 @@ void VideoContext::demultiplex() {
 void VideoContext::decode() {
     try {
         for (;;) {
-            // Create AVFrame and packet.
-            std::unique_ptr<AVFrame, std::function<void(AVFrame *)>>
-                    frame_decoded{
-                    av_frame_alloc(), [](AVFrame *f) { av_frame_free(&f); }};
 
             std::unique_ptr<AVPacket, std::function<void(AVPacket *)>> packet{
                     nullptr, [](AVPacket *p) {
@@ -398,13 +394,24 @@ void VideoContext::decode() {
 
             // If the packet didn't send, receive more frames and try again
             bool sent = false;
+            bool frame_received = true;
             while (!sent) {
                 sent = this->sendPacketToDecoder(packet.get());
-                while (this->receiveFrameFromDecoder(frame_decoded.get())) {
+                for (;;) {
+                    // Create AVFrame and packet.
+                    std::unique_ptr<AVFrame, std::function<void(AVFrame *)>>
+                            frame_decoded{
+                            av_frame_alloc(), [](AVFrame *f) { av_frame_unref(f);av_frame_free(&f); }};
+
+                    if (!this->receiveFrameFromDecoder(frame_decoded.get()))
+                        break;
+
+
                     printf("received video frame from decoder with pts:%li\n", frame_decoded->pts);
                     if (!frame_queue_->push(move(frame_decoded))) {
                         break;
                     }
+
                 }
             }
         }
@@ -423,7 +430,7 @@ void VideoContext::processFrames() {
     try {
         for (;;) {
             std::unique_ptr<AVFrame, std::function<void(AVFrame *)>> frame{
-                    nullptr, [](AVFrame *f) { av_frame_free(&f); }};
+                    av_frame_alloc(), [](AVFrame *f) { av_frame_free(&f); }};
 
             // Do logic here, pop from frame_queue and push to processed queue.
             if (!this->frame_queue_->pop(frame)) {
@@ -449,7 +456,7 @@ void VideoContext::encode() {
         for (;;) {
             // Create AVFrame.
             std::unique_ptr<AVFrame, std::function<void(AVFrame *)>> frame{
-                    nullptr, [](AVFrame *f) { av_frame_free(&f); }};
+                    av_frame_alloc(), [](AVFrame *f) { av_frame_unref(f); av_frame_free(&f);}};
 
 
             // Pop from processed queue and write in file.
@@ -498,6 +505,7 @@ void VideoContext::encode() {
 
 int VideoContext::writePacket(AVPacket* packet) {
     std::unique_lock<std::mutex> lock(this->mutex_);
+
     return av_interleaved_write_frame(this->ofmt_ctx, packet);
 
 }
