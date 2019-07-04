@@ -1,0 +1,290 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - coverage.info - /usr/include/x86_64-linux-gnu/libavutil/rational.h</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">usr/include/x86_64-linux-gnu/libavutil</a> - rational.h<span style="font-size: 80%;"> (source / <a href="rational.h.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">coverage.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-07-04 22:29:48</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            :  * rational numbers
+<span class="lineNum">       3 </span>            :  * Copyright (c) 2003 Michael Niedermayer &lt;michaelni@gmx.at&gt;
+<span class="lineNum">       4 </span>            :  *
+<span class="lineNum">       5 </span>            :  * This file is part of FFmpeg.
+<span class="lineNum">       6 </span>            :  *
+<span class="lineNum">       7 </span>            :  * FFmpeg is free software; you can redistribute it and/or
+<span class="lineNum">       8 </span>            :  * modify it under the terms of the GNU Lesser General Public
+<span class="lineNum">       9 </span>            :  * License as published by the Free Software Foundation; either
+<span class="lineNum">      10 </span>            :  * version 2.1 of the License, or (at your option) any later version.
+<span class="lineNum">      11 </span>            :  *
+<span class="lineNum">      12 </span>            :  * FFmpeg is distributed in the hope that it will be useful,
+<span class="lineNum">      13 </span>            :  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+<span class="lineNum">      14 </span>            :  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+<span class="lineNum">      15 </span>            :  * Lesser General Public License for more details.
+<span class="lineNum">      16 </span>            :  *
+<span class="lineNum">      17 </span>            :  * You should have received a copy of the GNU Lesser General Public
+<span class="lineNum">      18 </span>            :  * License along with FFmpeg; if not, write to the Free Software
+<span class="lineNum">      19 </span>            :  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+<span class="lineNum">      20 </span>            :  */
+<span class="lineNum">      21 </span>            : 
+<span class="lineNum">      22 </span>            : /**
+<span class="lineNum">      23 </span>            :  * @file
+<span class="lineNum">      24 </span>            :  * @ingroup lavu_math_rational
+<span class="lineNum">      25 </span>            :  * Utilties for rational number calculation.
+<span class="lineNum">      26 </span>            :  * @author Michael Niedermayer &lt;michaelni@gmx.at&gt;
+<span class="lineNum">      27 </span>            :  */
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span>            : #ifndef AVUTIL_RATIONAL_H
+<span class="lineNum">      30 </span>            : #define AVUTIL_RATIONAL_H
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            : #include &lt;stdint.h&gt;
+<span class="lineNum">      33 </span>            : #include &lt;limits.h&gt;
+<span class="lineNum">      34 </span>            : #include &quot;attributes.h&quot;
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span>            : /**
+<span class="lineNum">      37 </span>            :  * @defgroup lavu_math_rational AVRational
+<span class="lineNum">      38 </span>            :  * @ingroup lavu_math
+<span class="lineNum">      39 </span>            :  * Rational number calculation.
+<span class="lineNum">      40 </span>            :  *
+<span class="lineNum">      41 </span>            :  * While rational numbers can be expressed as floating-point numbers, the
+<span class="lineNum">      42 </span>            :  * conversion process is a lossy one, so are floating-point operations. On the
+<span class="lineNum">      43 </span>            :  * other hand, the nature of FFmpeg demands highly accurate calculation of
+<span class="lineNum">      44 </span>            :  * timestamps. This set of rational number utilities serves as a generic
+<span class="lineNum">      45 </span>            :  * interface for manipulating rational numbers as pairs of numerators and
+<span class="lineNum">      46 </span>            :  * denominators.
+<span class="lineNum">      47 </span>            :  *
+<span class="lineNum">      48 </span>            :  * Many of the functions that operate on AVRational's have the suffix `_q`, in
+<span class="lineNum">      49 </span>            :  * reference to the mathematical symbol &quot;ℚ&quot; (Q) which denotes the set of all
+<span class="lineNum">      50 </span>            :  * rational numbers.
+<span class="lineNum">      51 </span>            :  *
+<span class="lineNum">      52 </span>            :  * @{
+<span class="lineNum">      53 </span>            :  */
+<span class="lineNum">      54 </span>            : 
+<span class="lineNum">      55 </span>            : /**
+<span class="lineNum">      56 </span>            :  * Rational number (pair of numerator and denominator).
+<span class="lineNum">      57 </span>            :  */
+<span class="lineNum">      58 </span>            : typedef struct AVRational{
+<span class="lineNum">      59 </span>            :     int num; ///&lt; Numerator
+<span class="lineNum">      60 </span>            :     int den; ///&lt; Denominator
+<span class="lineNum">      61 </span>            : } AVRational;
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span>            : /**
+<span class="lineNum">      64 </span>            :  * Create an AVRational.
+<span class="lineNum">      65 </span>            :  *
+<span class="lineNum">      66 </span>            :  * Useful for compilers that do not support compound literals.
+<span class="lineNum">      67 </span>            :  *
+<span class="lineNum">      68 </span>            :  * @note The return value is not reduced.
+<span class="lineNum">      69 </span>            :  * @see av_reduce()
+<span class="lineNum">      70 </span>            :  */
+<span class="lineNum">      71 </span>            : static inline AVRational av_make_q(int num, int den)
+<span class="lineNum">      72 </span>            : {
+<span class="lineNum">      73 </span>            :     AVRational r = { num, den };
+<span class="lineNum">      74 </span>            :     return r;
+<span class="lineNum">      75 </span>            : }
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : /**
+<span class="lineNum">      78 </span>            :  * Compare two rationals.
+<span class="lineNum">      79 </span>            :  *
+<span class="lineNum">      80 </span>            :  * @param a First rational
+<span class="lineNum">      81 </span>            :  * @param b Second rational
+<span class="lineNum">      82 </span>            :  *
+<span class="lineNum">      83 </span>            :  * @return One of the following values:
+<span class="lineNum">      84 </span>            :  *         - 0 if `a == b`
+<span class="lineNum">      85 </span>            :  *         - 1 if `a &gt; b`
+<span class="lineNum">      86 </span>            :  *         - -1 if `a &lt; b`
+<span class="lineNum">      87 </span>            :  *         - `INT_MIN` if one of the values is of the form `0 / 0`
+<span class="lineNum">      88 </span>            :  */
+<span class="lineNum">      89 </span>            : static inline int av_cmp_q(AVRational a, AVRational b){
+<span class="lineNum">      90 </span>            :     const int64_t tmp= a.num * (int64_t)b.den - b.num * (int64_t)a.den;
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            :     if(tmp) return (int)((tmp ^ a.den ^ b.den)&gt;&gt;63)|1;
+<span class="lineNum">      93 </span>            :     else if(b.den &amp;&amp; a.den) return 0;
+<span class="lineNum">      94 </span>            :     else if(a.num &amp;&amp; b.num) return (a.num&gt;&gt;31) - (b.num&gt;&gt;31);
+<span class="lineNum">      95 </span>            :     else                    return INT_MIN;
+<span class="lineNum">      96 </span>            : }
+<span class="lineNum">      97 </span>            : 
+<span class="lineNum">      98 </span>            : /**
+<span class="lineNum">      99 </span>            :  * Convert an AVRational to a `double`.
+<span class="lineNum">     100 </span>            :  * @param a AVRational to convert
+<span class="lineNum">     101 </span>            :  * @return `a` in floating-point form
+<a name="102"><span class="lineNum">     102 </span>            :  * @see av_d2q()</a>
+<span class="lineNum">     103 </span>            :  */
+<span class="lineNum">     104 </span><span class="lineCov">        441 : static inline double av_q2d(AVRational a){</span>
+<span class="lineNum">     105 </span><span class="lineCov">        441 :     return a.num / (double) a.den;</span>
+<span class="lineNum">     106 </span>            : }
+<span class="lineNum">     107 </span>            : 
+<span class="lineNum">     108 </span>            : /**
+<span class="lineNum">     109 </span>            :  * Reduce a fraction.
+<span class="lineNum">     110 </span>            :  *
+<span class="lineNum">     111 </span>            :  * This is useful for framerate calculations.
+<span class="lineNum">     112 </span>            :  *
+<span class="lineNum">     113 </span>            :  * @param[out] dst_num Destination numerator
+<span class="lineNum">     114 </span>            :  * @param[out] dst_den Destination denominator
+<span class="lineNum">     115 </span>            :  * @param[in]      num Source numerator
+<span class="lineNum">     116 </span>            :  * @param[in]      den Source denominator
+<span class="lineNum">     117 </span>            :  * @param[in]      max Maximum allowed values for `dst_num` &amp; `dst_den`
+<span class="lineNum">     118 </span>            :  * @return 1 if the operation is exact, 0 otherwise
+<span class="lineNum">     119 </span>            :  */
+<span class="lineNum">     120 </span>            : int av_reduce(int *dst_num, int *dst_den, int64_t num, int64_t den, int64_t max);
+<span class="lineNum">     121 </span>            : 
+<span class="lineNum">     122 </span>            : /**
+<span class="lineNum">     123 </span>            :  * Multiply two rationals.
+<span class="lineNum">     124 </span>            :  * @param b First rational
+<span class="lineNum">     125 </span>            :  * @param c Second rational
+<span class="lineNum">     126 </span>            :  * @return b*c
+<span class="lineNum">     127 </span>            :  */
+<span class="lineNum">     128 </span>            : AVRational av_mul_q(AVRational b, AVRational c) av_const;
+<span class="lineNum">     129 </span>            : 
+<span class="lineNum">     130 </span>            : /**
+<span class="lineNum">     131 </span>            :  * Divide one rational by another.
+<span class="lineNum">     132 </span>            :  * @param b First rational
+<span class="lineNum">     133 </span>            :  * @param c Second rational
+<span class="lineNum">     134 </span>            :  * @return b/c
+<span class="lineNum">     135 </span>            :  */
+<span class="lineNum">     136 </span>            : AVRational av_div_q(AVRational b, AVRational c) av_const;
+<span class="lineNum">     137 </span>            : 
+<span class="lineNum">     138 </span>            : /**
+<span class="lineNum">     139 </span>            :  * Add two rationals.
+<span class="lineNum">     140 </span>            :  * @param b First rational
+<span class="lineNum">     141 </span>            :  * @param c Second rational
+<span class="lineNum">     142 </span>            :  * @return b+c
+<span class="lineNum">     143 </span>            :  */
+<span class="lineNum">     144 </span>            : AVRational av_add_q(AVRational b, AVRational c) av_const;
+<span class="lineNum">     145 </span>            : 
+<span class="lineNum">     146 </span>            : /**
+<span class="lineNum">     147 </span>            :  * Subtract one rational from another.
+<span class="lineNum">     148 </span>            :  * @param b First rational
+<span class="lineNum">     149 </span>            :  * @param c Second rational
+<span class="lineNum">     150 </span>            :  * @return b-c
+<span class="lineNum">     151 </span>            :  */
+<span class="lineNum">     152 </span>            : AVRational av_sub_q(AVRational b, AVRational c) av_const;
+<span class="lineNum">     153 </span>            : 
+<span class="lineNum">     154 </span>            : /**
+<span class="lineNum">     155 </span>            :  * Invert a rational.
+<span class="lineNum">     156 </span>            :  * @param q value
+<span class="lineNum">     157 </span>            :  * @return 1 / q
+<span class="lineNum">     158 </span>            :  */
+<span class="lineNum">     159 </span>            : static av_always_inline AVRational av_inv_q(AVRational q)
+<span class="lineNum">     160 </span>            : {
+<span class="lineNum">     161 </span>            :     AVRational r = { q.den, q.num };
+<span class="lineNum">     162 </span>            :     return r;
+<span class="lineNum">     163 </span>            : }
+<span class="lineNum">     164 </span>            : 
+<span class="lineNum">     165 </span>            : /**
+<span class="lineNum">     166 </span>            :  * Convert a double precision floating point number to a rational.
+<span class="lineNum">     167 </span>            :  *
+<span class="lineNum">     168 </span>            :  * In case of infinity, the returned value is expressed as `{1, 0}` or
+<span class="lineNum">     169 </span>            :  * `{-1, 0}` depending on the sign.
+<span class="lineNum">     170 </span>            :  *
+<span class="lineNum">     171 </span>            :  * @param d   `double` to convert
+<span class="lineNum">     172 </span>            :  * @param max Maximum allowed numerator and denominator
+<span class="lineNum">     173 </span>            :  * @return `d` in AVRational form
+<span class="lineNum">     174 </span>            :  * @see av_q2d()
+<span class="lineNum">     175 </span>            :  */
+<span class="lineNum">     176 </span>            : AVRational av_d2q(double d, int max) av_const;
+<span class="lineNum">     177 </span>            : 
+<span class="lineNum">     178 </span>            : /**
+<span class="lineNum">     179 </span>            :  * Find which of the two rationals is closer to another rational.
+<span class="lineNum">     180 </span>            :  *
+<span class="lineNum">     181 </span>            :  * @param q     Rational to be compared against
+<span class="lineNum">     182 </span>            :  * @param q1,q2 Rationals to be tested
+<span class="lineNum">     183 </span>            :  * @return One of the following values:
+<span class="lineNum">     184 </span>            :  *         - 1 if `q1` is nearer to `q` than `q2`
+<span class="lineNum">     185 </span>            :  *         - -1 if `q2` is nearer to `q` than `q1`
+<span class="lineNum">     186 </span>            :  *         - 0 if they have the same distance
+<span class="lineNum">     187 </span>            :  */
+<span class="lineNum">     188 </span>            : int av_nearer_q(AVRational q, AVRational q1, AVRational q2);
+<span class="lineNum">     189 </span>            : 
+<span class="lineNum">     190 </span>            : /**
+<span class="lineNum">     191 </span>            :  * Find the value in a list of rationals nearest a given reference rational.
+<span class="lineNum">     192 </span>            :  *
+<span class="lineNum">     193 </span>            :  * @param q      Reference rational
+<span class="lineNum">     194 </span>            :  * @param q_list Array of rationals terminated by `{0, 0}`
+<span class="lineNum">     195 </span>            :  * @return Index of the nearest value found in the array
+<span class="lineNum">     196 </span>            :  */
+<span class="lineNum">     197 </span>            : int av_find_nearest_q_idx(AVRational q, const AVRational* q_list);
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span>            : /**
+<span class="lineNum">     200 </span>            :  * Convert an AVRational to a IEEE 32-bit `float` expressed in fixed-point
+<span class="lineNum">     201 </span>            :  * format.
+<span class="lineNum">     202 </span>            :  *
+<span class="lineNum">     203 </span>            :  * @param q Rational to be converted
+<span class="lineNum">     204 </span>            :  * @return Equivalent floating-point value, expressed as an unsigned 32-bit
+<span class="lineNum">     205 </span>            :  *         integer.
+<span class="lineNum">     206 </span>            :  * @note The returned value is platform-indepedant.
+<span class="lineNum">     207 </span>            :  */
+<span class="lineNum">     208 </span>            : uint32_t av_q2intfloat(AVRational q);
+<span class="lineNum">     209 </span>            : 
+<span class="lineNum">     210 </span>            : /**
+<span class="lineNum">     211 </span>            :  * @}
+<span class="lineNum">     212 </span>            :  */
+<span class="lineNum">     213 </span>            : 
+<span class="lineNum">     214 </span>            : #endif /* AVUTIL_RATIONAL_H */
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.12</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
