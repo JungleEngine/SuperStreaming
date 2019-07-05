@@ -28,18 +28,18 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
 }
 
 int VideoContext::openInputFile() {
+
     this->ifmt_ctx = nullptr;
+
     if ((avformat_open_input(&this->ifmt_ctx, this->input_filename.c_str(), nullptr, nullptr)) < 0) {
 
-        fprintf(stderr, "Could not open input file '%s'", this->input_filename.c_str());
+        fprintf(stderr, "Could not open input file '%s'\n", this->input_filename.c_str());
         return -1;
     }
-
     if ((avformat_find_stream_info(ifmt_ctx, nullptr)) < 0) {
         fprintf(stderr, "Failed to retrieve input stream information");
         return -1;
     }
-
     av_dump_format(this->ifmt_ctx, 0, this->input_filename.c_str(), 0);
     return 0;
 }
@@ -406,7 +406,6 @@ void VideoContext::decode() {
                     std::unique_ptr<AVFrame, std::function<void(AVFrame *)>>
                             frame_decoded{
                             av_frame_alloc(), [](AVFrame *f) { av_frame_unref(f);av_frame_free(&f); }};
-
                     if (!this->receiveFrameFromDecoder(frame_decoded.get()))
                         break;
 

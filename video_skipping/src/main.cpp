@@ -3,7 +3,7 @@
 int main(int argc, char **argv)
 {
 
-    std::string input_filename = "sound.mp4";
+    std::string input_filename = "youtube.mp4";
     std::string output_filename = "out.mp4";
     VideoContext* video_cntx = new VideoContext(input_filename, output_filename);
 
