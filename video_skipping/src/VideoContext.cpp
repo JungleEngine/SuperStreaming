@@ -2,6 +2,7 @@
 // Created by syrix on 6/27/19.
 //
 
+#include <zconf.h>
 #include "VideoContext.h"
 
 VideoContext::VideoContext(std::string &input_filename, std::string &output_filename) :
@@ -19,13 +20,43 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
     this->openInputFile();
     this->openOutputFile();
 
+
     this->getDecoderCntx();
     this->getEncoderCntx();
 
     // Header should be written first.
     this->writeHeader();
 
+    // Set next_pts to -1, this should be our method to remove inter-frame gaps in pts.
+    this->next_pts = -1;
+    this->delta_pts = -1;
+    this->skip_frames = false;
+
+
 }
+
+void VideoContext::saveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
+    FILE *pFile;
+    char szFilename[32];
+    int y;
+
+    // Open file
+    sprintf(szFilename, "frame%d.ppm", iFrame);
+    pFile = fopen(szFilename, "wb");
+    if (pFile == NULL)
+        return;
+
+    // Write header
+    fprintf(pFile, "P6\n%d %d\n255\n", width, height);
+
+    // Write pixel data
+    for (y = 0; y < height; y++)
+        fwrite(pFrame->data[0] + y * pFrame->linesize[0], 1, width * 3, pFile);
+
+    // Close file
+    fclose(pFile);
+}
+
 
 int VideoContext::openInputFile() {
     this->ifmt_ctx = nullptr;
@@ -190,7 +221,7 @@ int VideoContext::getEncoderCntx() {
     printf("time_base:%d/%d\n", this->video_enc_cntx->time_base.num, this->video_enc_cntx->time_base.den);
 
     av_opt_set(this->video_enc_cntx->priv_data, "profile", "baseline", 0);
-    av_opt_set(this->video_enc_cntx->priv_data, "crf", "18", 0);
+//    av_opt_set(this->video_enc_cntx->priv_data, "crf", "21", 0);
 
     if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
         this->video_enc_cntx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -305,14 +336,16 @@ bool VideoContext::sendFrameToEncoder(AVFrame *frame) {
 
 bool VideoContext::receivePacketFromEncoder(AVPacket *packet) {
     auto ret = avcodec_receive_packet(this->video_enc_cntx, packet);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >= 0;
+    return ret >= 0;
 
 }
 
 /**
  * This function is responsible for initiating threads.
  */
-void VideoContext::runSkipping() {
+void VideoContext::runSkipping(bool skip_frames) {
+    this->skip_frames = skip_frames;
+
     this->stages_.emplace_back(&VideoContext::demultiplex, this);
     this->stages_.emplace_back(&VideoContext::decode, this);
     this->stages_.emplace_back(&VideoContext::processFrames, this);
@@ -322,9 +355,12 @@ void VideoContext::runSkipping() {
     for (auto &stage : stages_) {
         stage.join();
     }
+
     if (exception_) {
+        printf("exception... ok \n");
         std::rethrow_exception(exception_);
     }
+    this->writeReport();
 
 }
 
@@ -361,7 +397,8 @@ void VideoContext::demultiplex() {
 }
 
 
-void VideoContext::decode() {
+void *VideoContext::decode() {
+    int frames_decoded = 0;
     try {
         for (;;) {
 
@@ -409,22 +446,19 @@ void VideoContext::decode() {
 
                     if (!this->receiveFrameFromDecoder(frame_decoded.get()))
                         break;
-
-                    if (frame_decoded->interpolated_frame != nullptr) {
-                        printf("found interpolated.\n");
-                    } else {
-                        printf("NULL interpolated\n");
-                    }
+                    frames_decoded++;
 
 
-//                    printf("received video frame from decoder with pts:%li\n", frame_decoded->pts);
                     if (!frame_queue_->push(move(frame_decoded))) {
                         break;
                     }
 
                 }
             }
+
+
         }
+//        std::cout<<" frames decoded:%" << frames_decoded << std::endl;
     } catch (...) {
         this->exception_ = std::current_exception();
         this->frame_queue_->quit();
@@ -440,17 +474,71 @@ void VideoContext::processFrames() {
     try {
         for (;;) {
             std::unique_ptr<AVFrame, std::function<void(AVFrame *)>> frame{
-                    av_frame_alloc(), [](AVFrame *f) { av_frame_free(&f); }};
+                    av_frame_alloc(), [](AVFrame *f) {
+                        av_frame_unref(f);
+                        av_frame_free(&f);
+                    }};
 
+            std::vector<std::unique_ptr<AVFrame, std::function<void(AVFrame *)>>> ready_frames;
+            bool break_loop = false;
             // Do logic here, pop from frame_queue and push to processed queue.
-            if (!this->frame_queue_->pop(frame)) {
-                this->processed_frame_queue_->finished();
+            for (int i = 0; i < 3; i++) {
+
+                if (!this->frame_queue_->pop(frame)) {
+                    this->processed_frame_queue_->finished();
+                    break_loop = true;
+                    break;
+                }
+
+                // If next_pts != -1 ( we have skipped a frame before, then we should fill gaps by swapping next pts and current pts.
+                if (this->skip_frames) {
+                    if (this->next_pts != -1 && this->delta_pts != -1) {
+                        int64_t temp;
+                        temp = frame->pts;
+                        frame->pts = this->next_pts;
+                        this->next_pts += this->delta_pts;
+                    }
+                }
+
+                ready_frames.push_back(move(frame));
+            }
+            if (break_loop)
                 break;
+
+            // If 3 frames then process.
+
+            if (this->skip_frames && ready_frames.size() == 3) {
+                // Copy mid-frame info.
+                // Adding Parent potential new coded_picture_number;
+                int coded_picture_number = ready_frames[1]->coded_picture_number;
+                // Parent potential new pts
+                int64_t pts = ready_frames[1]->pts;
+                int64_t duration = ready_frames[1]->pkt_duration;
+                int repeat_pict = ready_frames[1]->repeat_pict;
+                skipped_frame.push_back(
+                        new VideoFrame(coded_picture_number, pts, duration, repeat_pict)
+                );
+
+                // Setting next_pts to parent's pts and copy child pts to parent and
+                this->next_pts = ready_frames[2]->pts;
+                this->delta_pts = this->next_pts - ready_frames[1]->pts;
+                ready_frames[2]->pts = pts;
+
+                // Remove mid_frame after swapping pts with parent_frame pts.
+                ready_frames.erase(ready_frames.begin() + 1);
             }
 
-            if (!this->processed_frame_queue_->push(move(frame))) {
-                break;
+
+            bool break_outer_loop = false;
+            for (auto &ready_frame : ready_frames) {
+                while (!this->processed_frame_queue_->push(move(ready_frame))) {
+                    usleep(10);
+                }
             }
+
+//            if (break_outer_loop)
+//                break;
+
 
         }
     } catch (...) {
@@ -462,6 +550,7 @@ void VideoContext::processFrames() {
 }
 
 void VideoContext::encode() {
+    int flushed = 1;
     try {
         for (;;) {
             // Create AVFrame.
@@ -474,13 +563,17 @@ void VideoContext::encode() {
 
             // Pop from processed queue and write in file.
             if (!this->processed_frame_queue_->pop(frame)) {
-                break;
+                frame = nullptr;
             }
+
 
 
             if (!this->sendFrameToEncoder(frame.get())) {
-                break;
+                flushed --;
+                this->sendFrameToEncoder(NULL);
             }
+
+
             for (;;) {
                 // Create AVPacket.
                 std::unique_ptr<AVPacket, std::function<void(AVPacket *)>> packet{
@@ -498,16 +591,20 @@ void VideoContext::encode() {
 
                 if (!this->receivePacketFromEncoder(packet.get()))
                     break;
-//                packet->stream_index = this->video_stream_indx;
+
                 if (this->writePacket(packet.get()) < 0) {
                     printf("error while writing video packet into output file\n");
                     break;
                 }
 
             }
+            if(!flushed)
+                break;
 
 
         }
+
+
     } catch (...) {
         this->frame_queue_->quit();
         this->packet_queue_->quit();
@@ -521,6 +618,19 @@ int VideoContext::writePacket(AVPacket *packet) {
 
     return av_interleaved_write_frame(this->ofmt_ctx, packet);
 
+}
+
+void VideoContext::writeReport() {
+    std::string file_name = this->output_filename + ".index";
+    std::ofstream ofs(file_name) ;
+
+    if( ! ofs )	{
+        std::cout << "Error opening file for indexing the movie" << std::endl ;
+        return;
+    }
+    for(auto &frame: skipped_frame){
+        ofs << frame->toString() << std::endl;
+    }
 }
 
 
