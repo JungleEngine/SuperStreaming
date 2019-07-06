@@ -4,19 +4,22 @@
 
 #ifndef DROP_FRAMES_VIDEOFRAME_H
 #define DROP_FRAMES_VIDEOFRAME_H
-#include<iostream>
+#include <iostream>
 #include<string>
+#include <sstream>
+#include <iterator>
+#include <vector>
 
 class VideoFrame {
 public:
-    int pts;
-    int dts;
-    int duration;
+    int coded_picture_number;
+    int64_t pts;
+    int64_t duration;
     int repeat_pict;
 
-    VideoFrame();
-//    load_properties(std::string);
-
+    VideoFrame(int coded_pict_number, int64_t pts, int64_t duration, int repeat_pict);
+    void loadString(std::string);
+    std::string toString();
 };
 
 

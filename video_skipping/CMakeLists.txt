@@ -8,4 +8,4 @@ find_package(Threads REQUIRED)
 
 add_executable(video_skipping src/main.cpp src/VideoContext.h src/VideoContext.cpp src/VideoFrame.h src/VideoFrame.cpp src/queue.h)
 
-target_link_libraries(video_skipping PRIVATE -lavcodec -lavformat -lavutil  -lswscale Threads::Threads)
+target_link_libraries(video_skipping PRIVATE -lavcodec -lavformat -lavutil -lswscale Threads::Threads)

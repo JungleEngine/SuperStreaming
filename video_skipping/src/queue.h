@@ -59,7 +59,8 @@ bool Queue<T>::push(T &&data) {
 
 			empty_.notify_all();
 			return true;
-		} else {
+		}
+		else {
 			full_.wait(lock);
 		}
 	}
