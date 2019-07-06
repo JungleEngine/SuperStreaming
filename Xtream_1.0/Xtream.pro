@@ -21,6 +21,7 @@ LIBS += \
         -L/usr/local/lib -lgcov
 
 
+
 INCLUDEPATH += \
             SDL2/SDL.h SDL2/SDL_thread.h \
             libavcodec/avcodec.h  \
