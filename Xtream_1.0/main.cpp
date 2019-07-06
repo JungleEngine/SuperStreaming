@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
     qmlRegisterType<Player>("Player",1,0,"Player");
     QQuickView view;
     view.setResizeMode(QQuickView::SizeRootObjectToView);
-    view.setSource(QUrl::fromLocalFile("/home/dawod/GP/Xtream_1.0" + QLatin1String("/Xtream.qml")));
+    view.setSource(QUrl::fromLocalFile(QLatin1String("Xtream.qml")));
 
     const QString lowerArgument = QString::fromLatin1(argv[1]).toLower();
     if (lowerArgument == QLatin1String("--fullscreen")) {

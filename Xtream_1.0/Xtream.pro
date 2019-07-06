@@ -10,15 +10,15 @@ QMAKE_CXXFLAGS += -fprofile-arcs -ftest-coverage
 
 LIBS += \
         -L/usr/lib -lSDL2 \
-        -L/usr/lib -lavcodec \
-        -L/usr/lib -lavformat \
-        -L/usr/lib -lavutil \
-        -L/usr/lib -lavresample \
-        -L/usr/lib -lswscale \
-        -L/usr/lib -lswresample \
-        -L/usr/lib -lgtest \
-        -L/usr/lib -lgtest_main \
-        -L/usr/lib -lgcov
+        -L/usr/local/lib -lavcodec \
+        -L/usr/local/lib -lavformat \
+        -L/usr/local/lib -lavutil \
+        -L/usr/local/lib -lavresample \
+        -L/usr/local/lib -lswscale \
+        -L/usr/local/lib -lswresample \
+        -L/usr/local/lib -lgtest \
+        -L/usr/local/lib -lgtest_main \
+        -L/usr/local/lib -lgcov
 
 
 INCLUDEPATH += \

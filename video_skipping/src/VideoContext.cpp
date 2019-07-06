@@ -62,7 +62,6 @@ int VideoContext::openOutputFile() {
         AVCodecParameters *in_codecpar = in_stream->codecpar;
 
 
-
         out_stream = avformat_new_stream(this->ofmt_ctx, nullptr);
         if (!out_stream) {
             fprintf(stderr, "Failed allocating output stream\n");
@@ -88,7 +87,6 @@ int VideoContext::openOutputFile() {
         }
 
 
-
     }
 
 
@@ -104,7 +102,7 @@ void VideoContext::close_input_file() {
 
 
 void VideoContext::close_output_file() {
-        av_write_trailer(ofmt_ctx);
+    av_write_trailer(ofmt_ctx);
     if (this->ofmt_ctx && !(this->ofmt_ctx->oformat->flags & AVFMT_NOFILE))
         avio_closep(&this->ofmt_ctx->pb);
     avformat_free_context(this->ofmt_ctx);
@@ -283,31 +281,31 @@ int VideoContext::writeHeader() {
 
 bool VideoContext::sendPacketToDecoder(AVPacket *packet) {
     auto ret = avcodec_send_packet(this->video_dec_cntx, packet);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >= 0;
 
 }
 
 
 bool VideoContext::receiveFrameFromDecoder(AVFrame *frame) {
-    if(frame == nullptr){
+    if (frame == nullptr) {
         frame = av_frame_alloc();
     }
     auto ret = avcodec_receive_frame(this->video_dec_cntx, frame);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >= 0;
 
 }
 
 
 bool VideoContext::sendFrameToEncoder(AVFrame *frame) {
     auto ret = avcodec_send_frame(this->video_enc_cntx, frame);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >= 0;
 
 }
 
 
 bool VideoContext::receivePacketFromEncoder(AVPacket *packet) {
     auto ret = avcodec_receive_packet(this->video_enc_cntx, packet);
-    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >=0;
+    return !(ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) && ret >= 0;
 
 }
 
@@ -382,8 +380,7 @@ void VideoContext::decode() {
 //            printf("to be decoded audio packet of type:%i|pts:%li\n", packet->stream_index, packet->pts);
 
             // Audio packets should be written directly into output file.
-            if (packet->stream_index == this->audio_stream_indx) {
-                ;
+            if (packet->stream_index == this->audio_stream_indx) { ;
                 if (this->writePacket(packet.get()) < 0) {
                     printf("error while writing audio packet into output file\n");
                     break;
@@ -405,15 +402,12 @@ void VideoContext::decode() {
                     // Create AVFrame and packet.
                     std::unique_ptr<AVFrame, std::function<void(AVFrame *)>>
                             frame_decoded{
-                            av_frame_alloc(), [](AVFrame *f) { av_frame_unref(f);av_frame_free(&f); }};
+                            av_frame_alloc(), [](AVFrame *f) {
+                                av_frame_unref(f);
+                                av_frame_free(&f);
+                            }};
                     if (!this->receiveFrameFromDecoder(frame_decoded.get()))
                         break;
-
-                    if(frame_decoded->interpolated_frame != nullptr)
-                    {
-                        printf("found interpolated.\n");
-                    }
-
 
 //                    printf("received video frame from decoder with pts:%li\n", frame_decoded->pts);
                     if (!frame_queue_->push(move(frame_decoded))) {
@@ -464,7 +458,10 @@ void VideoContext::encode() {
         for (;;) {
             // Create AVFrame.
             std::unique_ptr<AVFrame, std::function<void(AVFrame *)>> frame{
-                    av_frame_alloc(), [](AVFrame *f) { av_frame_unref(f); av_frame_free(&f);}};
+                    av_frame_alloc(), [](AVFrame *f) {
+                        av_frame_unref(f);
+                        av_frame_free(&f);
+                    }};
 
 
             // Pop from processed queue and write in file.
@@ -500,8 +497,6 @@ void VideoContext::encode() {
                 }
 
             }
-
-
         }
     } catch (...) {
         this->frame_queue_->quit();
@@ -511,7 +506,7 @@ void VideoContext::encode() {
 }
 
 
-int VideoContext::writePacket(AVPacket* packet) {
+int VideoContext::writePacket(AVPacket *packet) {
     std::unique_lock<std::mutex> lock(this->mutex_);
 
     return av_interleaved_write_frame(this->ofmt_ctx, packet);

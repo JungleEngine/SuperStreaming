@@ -1841,9 +1841,10 @@ int decode_thread(void * arg)
     }
     else
     {
+	printf("before stream_component_open\n");
         // open video stream component codec
         ret = stream_component_open(videoState, videoStream);
-
+	printf("after stream_component_open\n");
         // check video codec was opened correctly
         if (ret < 0)
         {
