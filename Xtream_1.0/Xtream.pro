@@ -9,15 +9,15 @@ SOURCES += main.cpp \
 QMAKE_CXXFLAGS += -fprofile-arcs -ftest-coverage
 
 LIBS += \
-        -L/usr/lib -lSDL2 \
-        -L/usr/lib -lavcodec \
-        -L/usr/lib -lavformat \
-        -L/usr/lib -lavutil \
-        -L/usr/lib -lavresample \
-        -L/usr/lib -lswscale \
-        -L/usr/lib -lswresample \
-        -L/usr/lib -lgtest \
-        -L/usr/lib -lgtest_main \
+        -L/usr/local -lSDL2 \
+        -L/usr/local -lavcodec \
+        -L/usr/local -lavformat \
+        -L/usr/local -lavutil \
+        -L/usr/local -lavresample \
+        -L/usr/local -lswscale \
+        -L/usr/local -lswresample \
+        -L/usr/lb -lgtest \
+        -L/usr/lb -lgtest_main \
         -L/usr/lib -lgcov
 
 

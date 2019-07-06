@@ -6,6 +6,8 @@ Item {
     property bool isShown: false
     property string image
     property string name
+    property string link
+    property string src
     property string year
     property string director
     property string cast
@@ -198,7 +200,11 @@ Item {
             onClicked:
             {
 
-                player.play("rtsp://127.0.0.1:8554/baz.mkv",settings.player_type);
+                print("the link is the film name")
+                print(root.link)
+                player.play(root.link,settings.player_type);
+
+
 
             }
 //        }

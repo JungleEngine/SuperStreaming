@@ -27,6 +27,8 @@ Item {
                 detailsView.name =  model.name
                 detailsView.year = model.year
                 detailsView.director = model.director
+                detailsView.link = model.link
+                detailsView.src = model.src
                 detailsView.cast = model.cast
                 detailsView.rating = model.rating
                 detailsView.overview = model.overview
