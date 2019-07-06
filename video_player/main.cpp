@@ -30,6 +30,8 @@ int main()
 
 //    "rtsp://127.0.1.1:8554/baz3.mkv";
 //    "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv"
+
+
     videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv";
     videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv.index";
     loadIndexFile(videoState);
