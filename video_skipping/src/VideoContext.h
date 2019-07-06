@@ -4,11 +4,16 @@
 
 #ifndef DROP_FRAMES_VIDEOCONTEXT_H
 #define DROP_FRAMES_VIDEOCONTEXT_H
-#include<iostream>
+#include <iostream>
 #include <algorithm>
-#include<string>
+#include <string>
 #include <thread>
+#include <vector>
+#include <fstream>
+
 #include "queue.h"
+#include "VideoFrame.h"
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/timestamp.h>
@@ -25,7 +30,12 @@ private:
 
     std::vector<std::thread> stages_;
     std::exception_ptr exception_{};
-    int t =0;
+
+    std::vector<VideoFrame*> skipped_frame;
+    int64_t delta_pts;
+    int64_t next_pts;
+
+    bool skip_frames;
 
 public:
     AVCodecContext *video_dec_cntx;
@@ -54,17 +64,15 @@ public:
     int getDecoderCntx();
     int getEncoderCntx();
 
-    void runSkipping();
+    void runSkipping(bool skip_frames);
 
     void demultiplex();
-    void decode();
+    void * decode();
     void processFrames();
     void encode();
 
 
     int writeHeader();
-    int writePacket();
-
 //    int decodeFrames();
 
     void close_input_file();
@@ -80,6 +88,10 @@ public:
     bool receivePacketFromEncoder(AVPacket *packet);
 
     int writePacket(AVPacket *);
+
+    void saveFrame(AVFrame *pFrame, int width, int height, int iFrame);
+
+    void writeReport();
 };
 
 

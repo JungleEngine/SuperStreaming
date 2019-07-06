@@ -8,7 +8,8 @@ int main(int argc, char **argv)
     VideoContext* video_cntx = new VideoContext(input_filename, output_filename);
 
 
-    video_cntx->runSkipping();
+
+    video_cntx->runSkipping(true);
     video_cntx->close_input_file();
     video_cntx->close_output_file();
 

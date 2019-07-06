@@ -12,7 +12,6 @@ find_library(AVFORMAT_LIBRARY avformat)
 find_path(AVUTIL_INCLUDE_DIR libavutil/avutil.h libavutil/timestamp.h libavutil/opt.h)
 find_library(AVUTIL_LIBRARY avutil)
 
-
 find_path(AVRESAMPLE_INCLUDE_DIR libavresample/avresample.h)
 find_library(AVRESAMPLE_LIBRARY avresample)
 
