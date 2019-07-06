@@ -4,7 +4,6 @@
 int main()
 {
 
-    av_register_all();
     avformat_network_init();
     int ret = -1;
 
@@ -28,7 +27,12 @@ int main()
     // copy the file name input by the user to the VideoState structure
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
-    videoState->filename = "rtsp://127.0.1.1:8554/GOT.mkv";
+
+//    "rtsp://127.0.1.1:8554/baz3.mkv";
+//    "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv"
+    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv";
+    videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv.index";
+    loadIndexFile(videoState);
     // parse max frames to decode input by the user
     char * pEnd;
 
