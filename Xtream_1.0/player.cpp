@@ -1,7 +1,11 @@
 #include "player.h"
 #include <string.h>
+#include <stdio.h>
 #include "transcoding.h"
 #include <bits/stdc++.h>
+
+using namespace std;
+
 
 Player::Player(QObject *parent):
 QObject(parent)
@@ -16,16 +20,23 @@ QObject(parent)
 
 void Player::play(QString txt , bool player_type)
 {
-    //transcoding("rtsp://127.0.0.1:8554/test.mkv");
-    QByteArray ba2 = txt.toLocal8Bit();
-    txt  = "ffplay "+txt;
-     QByteArray ba = txt.toLocal8Bit();
-     char *filmName = ba.data();
-     char *filmName2 = ba2.data();
 
-     //printf("\n\nDAWOD__________________________ %s\n\n",filmName);
-     if (player_type==1)
-         system( filmName /*"ffplay rtsp://127.0.0.1:8554/baz.mkv"*/);
+
+    string filmName = txt.toStdString();
+
+    printf("string = %s\n",filmName);
+    string filmName1  = "/home/dawod/GP/Xtream_1.0/FFmpeg/ffplay "+filmName;
+    printf("string = %s\n",filmName1);
+
+
+     if (player_type==1){
+         const char * filmNamee = filmName1.c_str();
+         system( filmNamee /*"ffplay rtsp://127.0.0.1:8554/baz.mkv"*/);
+     }
      else
-   transcoding(filmName2);
+     {
+         const char * filmNamee = filmName.c_str();
+   transcoding(filmNamee);
+     }
+
 }

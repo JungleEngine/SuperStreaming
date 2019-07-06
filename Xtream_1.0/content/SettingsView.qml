@@ -91,17 +91,11 @@ Item {
                 checked: settings.no_interpolation
                 onCheckedChanged: {
                     settings.no_interpolation = checked;
+                    settings.perfect_interpolation = false
+                    perfect.checked = false
+                    settings.runtime_interpolation = false
+                    runtime.checked = false
 
-//                    perfect.releaseSwitch()
-//                    runtime.releaseSwitch()
-
-//                    if(settings.perfect_interpolation == checked){
-//                        settings.perfect_interpolation = !checked
-//                    }
-
-//                    if(settings.runtime_interpolation == checked){
-//                        settings.runtime_interpolation = !checked
-//                    }
 
 
                     print("no_interpolation  : " + settings.no_interpolation);
@@ -122,15 +116,14 @@ Item {
                 checked: settings.perfect_interpolation
                 onCheckedChanged: {
                     settings.perfect_interpolation = checked;
+                    settings.no_interpolation = false
+                    no.checked = false
+                    settings.runtime_interpolation = false
+                    runtime.checked = false
 
-//                    if(settings.no_interpolation == checked){
-//                        settings.no_interpolation = !checked
-//                    }
-
-//                    if(settings.runtime_interpolation == checked){
-//                        settings.runtime_interpolation = !checked
-//                    }
-
+                    print("no_interpolation  : " + settings.no_interpolation);
+                    print("perfect_interpolation  : " + settings.perfect_interpolation);
+                    print("runtime_interpolation  : " + settings.runtime_interpolation);
                 }
             }
             Rectangle {
@@ -145,15 +138,14 @@ Item {
                 checked: settings.runtime_interpolation
                 onCheckedChanged: {
                     settings.runtime_interpolation = checked;
+                    settings.perfect_interpolation = false
+                    perfect.checked = false
+                    settings.no_interpolation = false
+                    no.checked = false
 
-//                    if(settings.perfect_interpolation == checked){
-//                        settings.perfect_interpolation = !checked
-//                    }
-
-//                    if(settings.no_interpolation == checked){
-//                        settings.no_interpolation = !checked
-//                    }
-
+                    print("no_interpolation  : " + settings.no_interpolation);
+                    print("perfect_interpolation  : " + settings.perfect_interpolation);
+                    print("runtime_interpolation  : " + settings.runtime_interpolation);
                 }
             }
             Rectangle {
