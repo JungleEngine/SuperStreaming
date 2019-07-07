@@ -30,7 +30,18 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
     // Set next_pts to -1, this should be our method to remove inter-frame gaps in pts.
     this->next_pts = -1;
     this->delta_pts = -1;
+    this->skipped_count = 0;
     this->skip_frames = false;
+
+    // Create videoSkipping.
+        this->videoSkipping = std::make_unique<Skipping>("df",this->video_dec_cntx->height,
+        this->video_dec_cntx->width, this->video_dec_cntx->pix_fmt);
+
+    // Create context to convert yuv to BGR.
+//    this->sws_ctx = sws_getContext(this->video_dec_cntx->width, this->video_dec_cntx->height,
+//                                   this->video_dec_cntx->pix_fmt,
+//                                   this->video_dec_cntx->width, this->video_dec_cntx->height, AV_PIX_FMT_BGR24,
+//                                   SWS_FAST_BILINEAR, NULL, NULL, NULL);
 
 
 }
@@ -167,6 +178,7 @@ int VideoContext::getDecoderCntx() {
         /* Reencode video & audio and remux subtitles etc. */
         if (codec_cntx->codec_type == AVMEDIA_TYPE_VIDEO) {
             codec_cntx->framerate = av_guess_frame_rate(ifmt_ctx, stream, nullptr);
+            codec_cntx->time_base = stream->time_base;
             this->video_dec_cntx = codec_cntx;
 
 
@@ -218,6 +230,7 @@ int VideoContext::getEncoderCntx() {
 
     /* video time_base can be set to whatever is handy and supported by encoder */
     this->video_enc_cntx->time_base = this->ifmt_ctx->streams[this->video_stream_indx]->time_base;
+    this->video_enc_cntx->framerate = this->ifmt_ctx->streams[this->video_stream_indx]->r_frame_rate;
     printf("time_base:%d/%d\n", this->video_enc_cntx->time_base.num, this->video_enc_cntx->time_base.den);
 
     av_opt_set(this->video_enc_cntx->priv_data, "profile", "baseline", 0);
@@ -508,9 +521,18 @@ void VideoContext::processFrames() {
             // If 3 frames then process.
 
             if (this->skip_frames && ready_frames.size() == 3) {
+
+                bool drop_mid = true;
+                // Check if drop mid
+
+                drop_mid = this->videoSkipping->shouldSkip(ready_frames[0].get(),
+                                                           ready_frames[1].get(),
+                                                           ready_frames[2].get());
+                // Drop..
+                if(drop_mid){
                 // Copy mid-frame info.
                 // Adding Parent potential new coded_picture_number;
-                int coded_picture_number = ready_frames[1]->coded_picture_number;
+                int coded_picture_number = ready_frames[1]->coded_picture_number - this->skipped_count++;
                 // Parent potential new pts
                 int64_t pts = ready_frames[1]->pts;
                 int64_t duration = ready_frames[1]->pkt_duration;
@@ -526,6 +548,10 @@ void VideoContext::processFrames() {
 
                 // Remove mid_frame after swapping pts with parent_frame pts.
                 ready_frames.erase(ready_frames.begin() + 1);
+                }
+
+
+
             }
 
 
@@ -631,6 +657,8 @@ void VideoContext::writeReport() {
     for(auto &frame: skipped_frame){
         ofs << frame->toString() << std::endl;
     }
+
+    this->videoSkipping->printReport();
 }
 
 

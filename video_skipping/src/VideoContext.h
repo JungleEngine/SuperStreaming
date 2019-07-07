@@ -13,8 +13,9 @@
 
 #include "queue.h"
 #include "VideoFrame.h"
-
+#include "Skipping.h"
 extern "C" {
+#include <libswscale/swscale.h>
 #include <libavformat/avformat.h>
 #include <libavutil/timestamp.h>
 #include <libavutil/opt.h>
@@ -34,8 +35,12 @@ private:
     std::vector<VideoFrame*> skipped_frame;
     int64_t delta_pts;
     int64_t next_pts;
-
+    int skipped_count;
     bool skip_frames;
+
+    std::unique_ptr<Skipping> videoSkipping;
+
+
 
 public:
     AVCodecContext *video_dec_cntx;
