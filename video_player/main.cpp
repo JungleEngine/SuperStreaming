@@ -1,7 +1,7 @@
 #include "player.h"
 
 
-int main()
+int main(int argc, char *argv[])
 {
 
     av_register_all();
@@ -28,7 +28,7 @@ int main()
     // copy the file name input by the user to the VideoState structure
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
-    videoState->filename = "/home/mohamed/GP/SuperStreaming/video_skipping/cmake-build-debug/youtube.mp4";
+    videoState->filename = argv[1];//"rtsp://127.0.1.1:8554/baz.mkv";
     // parse max frames to decode input by the user
     char * pEnd;
 
