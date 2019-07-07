@@ -13,9 +13,9 @@
 class VideoFrame {
 public:
     int coded_picture_number;
-    int64_t pts;
-    int64_t duration;
-    int repeat_pict;
+//    int64_t pts;
+//    int64_t duration;
+//    int repeat_pict;
 
     VideoFrame(int coded_pict_number=0, int64_t pts=0, int64_t duration=0, int repeat_pict=0);
     void loadString(std::string);

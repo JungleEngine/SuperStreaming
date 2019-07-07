@@ -32,9 +32,9 @@ int main()
 //    "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv"
 
 
-    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv";
+    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz.mkv";
     videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv.index";
-    loadIndexFile(videoState);
+//    loadIndexFile(videoState);
     // parse max frames to decode input by the user
     char * pEnd;
 
