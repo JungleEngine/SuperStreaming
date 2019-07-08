@@ -26,7 +26,7 @@ cmake-build-*/
 *build*/
 benchmark/skipping/dataset/
 benchmark/skipping/images/
-*.png
+
 *.jpeg
 *.jpg
 *backup*.zip
