@@ -1,9 +1,10 @@
 #include "player.h"
 
 
-int main(int argc, char *argv[])
+int transcoding(const char *fileName)
 {
 
+    av_register_all();
     avformat_network_init();
     int ret = -1;
 
@@ -27,14 +28,7 @@ int main(int argc, char *argv[])
     // copy the file name input by the user to the VideoState structure
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
-    if(argc<3){
-        videoState->filename = "/home/mohamed/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/baz3.mkv";
-        videoState->index_filename = "/home/mohamed/GP/SuperStreaming/build-Xtream-Desktop_Qt_5_9_6_GCC_64bit-Debug/index/baz3.mkv.index";
-    }else {
-        videoState->filename = argv[1];//"rtsp://127.0.1.1:8554/baz.mkv";
-        videoState->index_filename = argv[2];
-    }
-	loadIndexFile(videoState);
+    videoState->filename = fileName;
     // parse max frames to decode input by the user
     char * pEnd;
 

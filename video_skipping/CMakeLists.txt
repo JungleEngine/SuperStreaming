@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.9)
 project(video_skipping)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
+find_package(Threads REQUIRED)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
+<<<<<<< HEAD
 find_package(Threads REQUIRED)
 find_path(AVCODEC_INCLUDE_DIR libavcodec/avcodec.h)
 find_library(AVCODEC_LIBRARY avcodec)
@@ -23,3 +25,14 @@ target_include_directories(video_skipping PRIVATE ${AVCODEC_INCLUDE_DIR} ${AVFOR
         ${LIBSWSCALE_INCLUDE_DIRS})
 target_link_libraries(video_skipping PRIVATE ${AVCODEC_LIBRARY} ${AVFORMAT_LIBRARY} ${AVUTIL_LIBRARY}
         ${SWSCALE_LIBRARY} Threads::Threads)
+=======
+add_executable(video_skipping src/main.cpp src/VideoContext.h src/VideoContext.cpp src/VideoFrame.h src/VideoFrame.cpp src/queue.h
+        src/Skipping.cpp src/Skipping.h  src/libs/cppflow/src/Model.cpp src/libs/cppflow/src/Tensor.cpp)
+
+find_package(OpenCV REQUIRED)
+
+
+include_directories(${OpenCV_INCLUDE_DIRS}  src/libs/cppflow/include)
+target_link_libraries(video_skipping PRIVATE -lavcodec -lavformat -lavutil -lswscale  Threads::Threads
+        -ltensorflow ${OpenCV_LIBS})
+>>>>>>> 1ff60c3c04ed058149b559202568e28b41d05632

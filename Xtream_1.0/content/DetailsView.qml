@@ -8,6 +8,7 @@ Item {
     property string name
     property string link
     property string src
+    property string indx
     property string year
     property string director
     property string cast
@@ -202,7 +203,15 @@ Item {
 
                 print("the link is the film name")
                 print(root.link)
-                player.play(root.link,settings.player_type);
+                print(root.src)
+                print(root.indx)
+                if (settings.runtime_interpolation){
+                    player.play(root.link, root.indx, settings.player_type);
+                }
+                if (settings.perfect_interpolation){
+                    player.play(root.src, root.indx ,settings.player_type);
+                }
+
 
 
 
