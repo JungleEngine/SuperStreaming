@@ -20,3 +20,15 @@ cmake-build-*/
 *.ali
 *.mkv
 *.mp4
+*.txt
+*.index
+*.mp4
+*build*/
+benchmark/skipping/dataset/
+benchmark/skipping/images/
+*.png
+*.jpeg
+*.jpg
+*backup*.zip
+
+

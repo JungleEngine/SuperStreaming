@@ -30,6 +30,17 @@ private:
      * Model attributes.
      */
     std::string modelPath;
+    Model* model;
+    Tensor* input_is_training;
+    Tensor* input_input_1;
+    Tensor* input_input_2;
+    Tensor* input_hold_prob_conv;
+    Tensor* input_hold_prob_fc;
+    Tensor* output_output;
+
+
+
+
 
     SwsContext* swsCtx;
     int videoHeight;
@@ -59,13 +70,16 @@ public:
                                        this->videoPixelFormat,
                                       this->videoWidth, this->videoHeight, AV_PIX_FMT_BGR24,
                                        SWS_FAST_BILINEAR, NULL, NULL, NULL);
-
         this->total_checked = 0;
         this->total_skipped = 0;
         this->total_skipped_model_decision = 0;
         this->total_skipped_MSE = 0;
 
         // Init model.
+        this->model = new Model(modelPath);
+        input_input_1 = new Tensor(*model, "input_1");
+        input_input_2 = new Tensor(*this->model, "input_2");
+        output_output = new Tensor(*this->model, "output");
 
 
     }
@@ -92,7 +106,28 @@ public:
         }
     }
 
+    double runModel(cv::Mat groundTruth, cv::Mat interpolated){
+        cv::Mat inp1;
+        cv::Mat inp2;
 
+        cv::resize(groundTruth, inp1, cv::Size(128, 128));
+        cv::resize(interpolated, inp2, cv::Size(128, 128));
+
+         std::vector<float > img1_data;
+         img1_data.assign(inp1.data, inp1.data + inp1.total() * inp1.channels());
+
+         std::vector<float > img2_data;
+         img2_data.assign(inp2.data, inp2.data + inp2.total() * inp2.channels());
+
+         this->input_input_1->set_data(img1_data, {1, 128, 128, 3});
+         this->input_input_2->set_data(img2_data, {1, 128, 128, 3});
+
+         this->model->run({input_input_1, input_input_2}, output_output);
+
+        double output = output_output->get_data<float>()[0];
+        return output;
+
+    }
     bool shouldSkip(AVFrame* firstFrame, AVFrame* secondFrame, AVFrame* thirdFrame){
         // First increment total_checked.
         this->total_checked++;
@@ -121,18 +156,23 @@ public:
         if(MSEScore > THRESHOLD_MSE){
             this->total_skipped_MSE++;
             this->total_skipped++;
+            return true;
 
         }else{
             // Check model.
-
+            double output = this->runModel(interpolated, groundTruth);
+            if(output <= 0.5){
+                this->total_skipped_model_decision++;
+                return true;
+            }
         }
+        return false;
 
-        std::cout<<" MSE: "<< MSEScore <<std::endl;
+
+//        std::cout<<" MSE: "<< MSEScore <<std::endl;
 
 //        cv::imwrite( "ground_truth" + std::to_string(PSNRScore) +".png", groundTruth);
 //        cv::imwrite( "frame_mid"+ std::to_string(PSNRScore) +".png", interpolated);
-
-        return true;
 
     }
 

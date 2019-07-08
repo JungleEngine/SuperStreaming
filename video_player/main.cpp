@@ -32,16 +32,17 @@ int main()
 //    "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv"
 
 
-    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz.mkv";
-    videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv.index";
-//    loadIndexFile(videoState);
+    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/dawood_test.mkv";
+    videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/dawood_test.mkv.index";
+    openIndexFile(videoState);
+
     // parse max frames to decode input by the user
     char * pEnd;
 
     // initialize locks for the display buffer (pictq)
     videoState->pictq_mutex = SDL_CreateMutex();
     videoState->pictq_cond = SDL_CreateCond();
-    create_window(videoState, "SuperStreaming|TV", 500, 500);
+    create_window(videoState, "SuperStreaming|TV", 1024, 768);
 
     // launch our threads by pushing an SDL_event of type FF_REFRESH_EVENT
     schedule_refresh(videoState, 1);

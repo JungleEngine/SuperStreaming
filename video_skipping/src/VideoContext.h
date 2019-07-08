@@ -40,7 +40,7 @@ private:
 
     std::unique_ptr<Skipping> videoSkipping;
 
-
+    std::ofstream indexOFStream;
 
 public:
     AVCodecContext *video_dec_cntx;
@@ -62,7 +62,7 @@ public:
 
 
     VideoContext(std::string& input_filename, std::string& output_filename);
-
+    ~VideoContext();
     int openInputFile();
     int openOutputFile();
 
@@ -97,6 +97,8 @@ public:
     void saveFrame(AVFrame *pFrame, int width, int height, int iFrame);
 
     void writeReport();
+
+    void writeIndex(std::string str);
 };
 
 

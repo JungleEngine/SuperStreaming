@@ -4,7 +4,7 @@ int main(int argc, char **argv)
 {
 
     std::string input_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz.mkv";
-    std::string output_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv";
+    std::string output_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz_skipped.mkv";
     VideoContext* video_cntx = new VideoContext(input_filename, output_filename);
 
 

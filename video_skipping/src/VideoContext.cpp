@@ -34,8 +34,11 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
     this->skip_frames = false;
 
     // Create videoSkipping.
-        this->videoSkipping = std::make_unique<Skipping>("df",this->video_dec_cntx->height,
-        this->video_dec_cntx->width, this->video_dec_cntx->pix_fmt);
+
+    this->videoSkipping = std::make_unique<Skipping>(
+            "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/src/frozen_models/model.pb",
+            this->video_dec_cntx->height,
+            this->video_dec_cntx->width, this->video_dec_cntx->pix_fmt);
 
     // Create context to convert yuv to BGR.
 //    this->sws_ctx = sws_getContext(this->video_dec_cntx->width, this->video_dec_cntx->height,
@@ -44,6 +47,9 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
 //                                   SWS_FAST_BILINEAR, NULL, NULL, NULL);
 
 
+
+    // Open index file.
+    this->indexOFStream.open(this->output_filename + ".index");
 }
 
 void VideoContext::saveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
@@ -234,7 +240,8 @@ int VideoContext::getEncoderCntx() {
     printf("time_base:%d/%d\n", this->video_enc_cntx->time_base.num, this->video_enc_cntx->time_base.den);
 
     av_opt_set(this->video_enc_cntx->priv_data, "profile", "baseline", 0);
-//    av_opt_set(this->video_enc_cntx->priv_data, "crf", "21", 0);
+    av_opt_set(this->video_enc_cntx->priv_data, "crf", "21", 0);
+    av_opt_set(this->video_enc_cntx->priv_data, "preset", "veryslow", 0);
 
     if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
         this->video_enc_cntx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -373,7 +380,9 @@ void VideoContext::runSkipping(bool skip_frames) {
         printf("exception... ok \n");
         std::rethrow_exception(exception_);
     }
-    this->writeReport();
+    this->videoSkipping->printReport();
+
+//    this->writeReport();
 
 }
 
@@ -493,8 +502,10 @@ void VideoContext::processFrames() {
                     }};
 
             std::vector<std::unique_ptr<AVFrame, std::function<void(AVFrame *)>>> ready_frames;
+
             bool break_loop = false;
             // Do logic here, pop from frame_queue and push to processed queue.
+            // As a hack, set dts to old pts.
             for (int i = 0; i < 3; i++) {
 
                 if (!this->frame_queue_->pop(frame)) {
@@ -502,9 +513,16 @@ void VideoContext::processFrames() {
                     break_loop = true;
                     break;
                 }
+                if(frame->interpolated_frame != nullptr)
+                    printf("found interpolated\n");
 
+
+                // Set opaque to null.
+                frame->opaque = nullptr;
                 // If next_pts != -1 ( we have skipped a frame before, then we should fill gaps by swapping next pts and current pts.
                 if (this->skip_frames) {
+                    frame->pkt_dts = frame->pts;
+//                    printf("pts:%li\n", frame->pts);
                     if (this->next_pts != -1 && this->delta_pts != -1) {
                         int64_t temp;
                         temp = frame->pts;
@@ -515,6 +533,7 @@ void VideoContext::processFrames() {
 
                 ready_frames.push_back(move(frame));
             }
+
             if (break_loop)
                 break;
 
@@ -529,27 +548,33 @@ void VideoContext::processFrames() {
                                                            ready_frames[1].get(),
                                                            ready_frames[2].get());
                 // Drop..
-                if(drop_mid){
-                // Copy mid-frame info.
-                // Adding Parent potential new coded_picture_number;
-                int coded_picture_number = ready_frames[1]->coded_picture_number - this->skipped_count++;
-                // Parent potential new pts
-                int64_t pts = ready_frames[1]->pts;
-                int64_t duration = ready_frames[1]->pkt_duration;
-                int repeat_pict = ready_frames[1]->repeat_pict;
-                skipped_frame.push_back(
-                        new VideoFrame(coded_picture_number, pts, duration, repeat_pict)
-                );
+                if (drop_mid) {
+                    // Copy mid-frame info.
+                    // Adding Parent potential new coded_picture_number;
+                    int coded_picture_number = ready_frames[1]->coded_picture_number - this->skipped_count++;
+                    // Parent potential new pts
+                    int64_t pts = ready_frames[1]->pts;
+                    int64_t duration = ready_frames[1]->pkt_duration;
+                    int repeat_pict = ready_frames[1]->repeat_pict;
 
-                // Setting next_pts to parent's pts and copy child pts to parent and
-                this->next_pts = ready_frames[2]->pts;
-                this->delta_pts = this->next_pts - ready_frames[1]->pts;
-                ready_frames[2]->pts = pts;
 
-                // Remove mid_frame after swapping pts with parent_frame pts.
-                ready_frames.erase(ready_frames.begin() + 1);
+                    skipped_frame.push_back(
+                            new VideoFrame(coded_picture_number, pts, duration, repeat_pict)
+                    );
+
+                    // Setting next_pts to parent's pts and copy child pts to parent and
+                    this->next_pts = ready_frames[2]->pts;
+                    this->delta_pts = this->next_pts - ready_frames[1]->pts;
+                    ready_frames[2]->pts = pts;
+                    // Set opaque to 1, in order to recognize this frame as parent of skipped frame.
+                    ready_frames[2]->opaque = (void *) 1;
+
+                    // Set skipped frame pts field value into parent pkt_duration.
+                    ready_frames[2]->pkt_duration = ready_frames[1]->pkt_dts;
+
+                    // Remove mid_frame after swapping pts with parent_frame pts.
+                    ready_frames.erase(ready_frames.begin() + 1);
                 }
-
 
 
             }
@@ -557,9 +582,22 @@ void VideoContext::processFrames() {
 
             bool break_outer_loop = false;
             for (auto &ready_frame : ready_frames) {
-                while (!this->processed_frame_queue_->push(move(ready_frame))) {
-                    usleep(10);
+                int isParentOfSkippedFrame = 0;
+                //Write ready_frame info (pkt dts which is same as pkt_pts).
+                if(ready_frame->opaque != nullptr){
+                    isParentOfSkippedFrame = 1;
+                    // Write child .
+                    this->writeIndex(std::to_string(ready_frame->pkt_duration) + " " + std::to_string(0));
                 }
+                // Write non-skipped.
+                this->writeIndex(std::to_string(ready_frame->pkt_dts) + " " + std::to_string(isParentOfSkippedFrame));
+
+
+                if (!this->processed_frame_queue_->push(move(ready_frame))) {
+//                    usleep(10);
+                    break;
+                }
+
             }
 
 //            if (break_outer_loop)
@@ -593,9 +631,8 @@ void VideoContext::encode() {
             }
 
 
-
             if (!this->sendFrameToEncoder(frame.get())) {
-                flushed --;
+                flushed--;
                 this->sendFrameToEncoder(NULL);
             }
 
@@ -624,7 +661,7 @@ void VideoContext::encode() {
                 }
 
             }
-            if(!flushed)
+            if (!flushed)
                 break;
 
 
@@ -648,17 +685,27 @@ int VideoContext::writePacket(AVPacket *packet) {
 
 void VideoContext::writeReport() {
     std::string file_name = this->output_filename + ".index";
-    std::ofstream ofs(file_name) ;
+    std::ofstream ofs(file_name);
 
-    if( ! ofs )	{
-        std::cout << "Error opening file for indexing the movie" << std::endl ;
+    if (!ofs) {
+        std::cout << "Error opening file for indexing the movie" << std::endl;
         return;
     }
-    for(auto &frame: skipped_frame){
+    for (auto &frame: skipped_frame) {
         ofs << frame->toString() << std::endl;
     }
 
-    this->videoSkipping->printReport();
+}
+
+
+void VideoContext::writeIndex(std::string str) {
+
+    this->indexOFStream << str << std::endl;
+}
+
+VideoContext::~VideoContext() {
+    this->indexOFStream.close();
+
 }
 
 
