@@ -41,7 +41,7 @@ private:
     std::unique_ptr<Skipping> videoSkipping;
 
     std::ofstream indexOFStream;
-
+    long int totalFrames;
 public:
     AVCodecContext *video_dec_cntx;
     AVCodecContext *audio_dec_cntx;
@@ -99,6 +99,8 @@ public:
     void writeReport();
 
     void writeIndex(std::string str);
+
+    void writeIndexFIleHeader();
 };
 
 

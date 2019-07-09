@@ -258,6 +258,7 @@ public:
     string filename;
     string index_filename;
     ifstream* indexIFStream;
+    AVRational indexFileTimebase;
 
 
     /**
@@ -276,6 +277,10 @@ public:
         this->indexIFStream->close();
         delete this->indexIFStream;
         this->indexIFStream = nullptr;
+        avcodec_free_context(&video_ctx);
+        sws_freeContext(sws_ctx);
+        SDL_free(screen);
+        SDL_free(texture);
     }
 };
 

@@ -10,8 +10,10 @@ int cnt = 0;
 #endif //TRANSCODING_PLAYER_H
 
 #include "video_state.h"
-bool readNextIndex(VideoState* videoState, int64_t& pts, int& parentOfSkippedFrame);
-int create_window(VideoState *videoState, string window_name, int width, int height) {
+
+bool readNextIndex(VideoState *videoState, int64_t &pts, int &parentOfSkippedFrame);
+
+int create_window(VideoState *videoState, const string &window_name, int width, int height) {
     // create a window with the specified position, dimensions, and flags.
     screen = SDL_CreateWindow(
             window_name.c_str(),
@@ -19,7 +21,7 @@ int create_window(VideoState *videoState, string window_name, int width, int hei
             SDL_WINDOWPOS_UNDEFINED,
             width,
             height,
-            SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI  | SDL_WINDOW_SHOWN | SDL_WINDOW_FOREIGN |SDL_WINDOW_RESIZABLE
+            SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_SHOWN | SDL_WINDOW_FOREIGN | SDL_WINDOW_RESIZABLE
     );
 
     // check window was correctly created
@@ -55,7 +57,7 @@ int create_window(VideoState *videoState, string window_name, int width, int hei
  */
 SDL_mutex *screen_mutex;
 
-VideoState* global_video_state;
+VideoState *global_video_state;
 
 /**
  * Initialize the given PacketQueue.
@@ -151,9 +153,8 @@ static int packet_queue_get(PacketQueue *queue, AVPacket *packet, int blocking) 
 
     for (;;) {
         // check quit flag
-        if(queue->size <=0){
-            if (global_video_state->finished_decoding)
-            {
+        if (queue->size <= 0) {
+            if (global_video_state->finished_decoding) {
                 printf("packet_queue_get finished\n");
                 ret = -1;
                 break;
@@ -691,7 +692,7 @@ int audio_decode_frame(VideoState *videoState, uint8_t *audio_buf, int buf_size,
 
             // get decoded output data from decoder
             int ret = avcodec_receive_frame(videoState->audio_ctx, avFrame);
-            if(ret < 0){
+            if (ret < 0) {
                 if (videoState->finished_decoding) {
                     printf("audio finished\n");
                     return -1;
@@ -753,7 +754,7 @@ int audio_decode_frame(VideoState *videoState, uint8_t *audio_buf, int buf_size,
             // keep audio_clock up-to-date
             pts = videoState->audio_clock;
             *pts_ptr = pts;
-            n = 2 * videoState->audio_ctx->channels;
+            n =  videoState->audio_ctx->channels;
             videoState->audio_clock += (double) data_size / (double) (n * videoState->audio_ctx->sample_rate);
 
             // we have the data, return it and come back for more later
@@ -779,7 +780,7 @@ int audio_decode_frame(VideoState *videoState, uint8_t *audio_buf, int buf_size,
 
         // keep audio_clock up-to-date
         if (avPacket->pts != AV_NOPTS_VALUE) {
-            videoState->audio_clock = av_q2d(videoState->audio_st->time_base) * avPacket->pts;
+            videoState->audio_clock = av_q2d(videoState->audio_st->time_base) * avPacket->pts ;
         }
     }
 
@@ -1078,7 +1079,7 @@ static int64_t guess_correct_pts(AVCodecContext *ctx, int64_t reordered_pts, int
 double synchronize_video(VideoState *videoState, AVFrame *src_frame, double pts) {
     double frame_delay;
 
-    if (pts != 0) {
+    if (pts > 0) {
         // if we have pts, set video clock to it
         videoState->video_clock = pts;
     } else {
@@ -1087,8 +1088,12 @@ double synchronize_video(VideoState *videoState, AVFrame *src_frame, double pts)
     }
 
     // update the video clock
-    frame_delay = av_q2d(videoState->video_ctx->time_base);
+    if(videoState->skippingMode){
+    frame_delay = av_q2d(videoState->indexFileTimebase);
+    }else{
+        frame_delay = av_q2d(videoState->video_st->time_base);
 
+    }
     // if we are repeating a frame, adjust clock accordingly
     frame_delay += src_frame->repeat_pict * (frame_delay * 0.5);
 
@@ -1096,21 +1101,7 @@ double synchronize_video(VideoState *videoState, AVFrame *src_frame, double pts)
 
     return pts;
 }
-int i = 3;
-double advanceVideoClock(VideoState* videoState, double pts=-1){
-    double ptsTime;
-//    if (pts != -1){
-//        ptsTime = pts * av_q2d(videoState->video_ctx->time_base);
-//        videoState->video_clock =  ptsTime;
-//    }else{
-//        ptsTime = videoState->video_clock;
-//    }
 
-    videoState->video_clock = i * av_q2d(videoState->video_ctx->time_base);
-    videoState->video_clock += av_q2d(videoState->video_ctx->time_base);
-    i+= 16;
-    return videoState->video_clock;
-}
 
 /**
  * This function is used as callback for the SDL_Thread.
@@ -1179,49 +1170,70 @@ int video_thread(void *arg) {
                 frameFinished = 1;
             }
 
-
             // did we get an entire video frame?
             if (frameFinished) {
 
+//                printf("pts:%li\n", pFrame->pts);
                 int64_t indexFilePTS = -1;
                 int isSkippedFrameParent = -1;
-                if(!readNextIndex(videoState, indexFilePTS, isSkippedFrameParent) && videoState->skippingMode){
+                if (!readNextIndex(videoState, indexFilePTS, isSkippedFrameParent) && videoState->skippingMode) {
                     printf("Skipped video with invalid index file.\n");
                     return -1;
                 }
-                printf("PTS:%li|isParentOfSkipped:%d\n", indexFilePTS, isSkippedFrameParent);
 
-                if(videoState->skippingMode){
+                if (videoState->skippingMode) {
 
-                    if(isSkippedFrameParent){
-                    // Add interpolated .. TODO: edit remove pFrame add interpolated_frame.
-                    double interpolatedPTSTime = synchronize_video(videoState, pFrame, indexFilePTS * av_q2d(videoState->video_st->time_base));
-                    if (queue_picture(videoState, pFrame, interpolatedPTSTime) < 0) {
-                        break;
-                    }
+                    if (isSkippedFrameParent == 0) {
+                        printf("index_file_pts:%li\n", indexFilePTS);
+                        // Add interpolated .. TODO: edit remove pFrame add interpolated_frame.
+                        double interpolatedPTSTime = synchronize_video(videoState, pFrame, indexFilePTS *
+                                                                                           av_q2d(videoState->indexFileTimebase));
 
-                    // read next and add parent;
-                    if(!readNextIndex(videoState, indexFilePTS, isSkippedFrameParent) && videoState->skippingMode){
-                        printf("Skipped video with invalid index file.\n");
-                        return -1;
-                    }
-                    double parentPTSTime = synchronize_video(videoState, pFrame, indexFilePTS * av_q2d(videoState->video_st->time_base));
-                    if (queue_picture(videoState, pFrame, parentPTSTime) < 0) {
-                        break;
-                    }
-                    }else{
-                        // This is parent just add it.
-                        double parentPTSTime = synchronize_video(videoState, pFrame, indexFilePTS * av_q2d(videoState->video_st->time_base));
+                        if(pFrame->interpolated_frame != nullptr)
+                        {
+                            if (queue_picture(videoState, pFrame, interpolatedPTSTime) < 0) {
+                                break;
+                            }
+
+                        }else{
+                            printf("interpolated not found, substituted with same frame.\n");
+                            if (queue_picture(videoState, pFrame, interpolatedPTSTime) < 0) {
+                                break;
+                            }
+                        }
+
+                        // read next and add parent;
+                        if (!readNextIndex(videoState, indexFilePTS, isSkippedFrameParent) &&
+                            videoState->skippingMode) {
+                            printf("Skipped video with invalid index file.\n");
+                            return -1;
+                        }
+                        printf("index_file_pts:%li\n", indexFilePTS);
+
+                        double parentPTSTime = synchronize_video(videoState, pFrame, indexFilePTS *
+                                                                                     av_q2d(videoState->indexFileTimebase));
                         if (queue_picture(videoState, pFrame, parentPTSTime) < 0) {
+                            break;
+                        }
+                    } else {
+                        // This is parent just add it.
+                        printf("index_file_pts:%li\n", indexFilePTS);
+                        double parentPTSTime = synchronize_video(videoState, pFrame, indexFilePTS *
+                                                                                     av_q2d(videoState->indexFileTimebase));
+                        if (queue_picture(videoState, pFrame, parentPTSTime) < 0) {
+
                             break;
                         }
 
                     }
 
-
-                }else{
+                } else {
                     // Just add frames no skipping mode...
-                    double ptsTime = synchronize_video(videoState, pFrame, pFrame->pts * av_q2d(videoState->video_st->time_base));
+                    printf("video clock:%lf\n", videoState->video_clock);
+                    printf("audio clock:%lf\n", videoState->audio_clock);
+//                    printf("pts:%li\n", pFrame->pts);
+                    double ptsTime = synchronize_video(videoState, pFrame,
+                                                       pFrame->pts * av_q2d(videoState->video_st->time_base));
                     if (queue_picture(videoState, pFrame, ptsTime) < 0) {
                         break;
                     }
@@ -1559,22 +1571,17 @@ int decode_thread(void *arg) {
         // read data from the AVFormatContext by repeatedly calling av_read_frame()
         ret = av_read_frame(videoState->pFormatCtx, packet);
         if (ret < 0) {
-            if (ret == AVERROR_EOF)
-            {
+            if (ret == AVERROR_EOF) {
                 // media EOF reached, quit
                 videoState->finished_decoding = 1;
                 break;
-            }
-            else if (videoState->pFormatCtx->pb->error == 0)
-            {
+            } else if (videoState->pFormatCtx->pb->error == 0) {
 
                 // no read error; wait for user input
                 SDL_Delay(10);
 
                 continue;
-            }
-            else
-            {
+            } else {
                 videoState->finished_decoding = 1;
 
                 // exit for loop in case of error
@@ -1877,7 +1884,7 @@ void video_refresh_timer(void *userdata) {
 }
 
 
-void openIndexFile(VideoState *videostate) {
+bool openIndexFile(VideoState *videostate) {
     videostate->skippingMode = false;
 //    videostate->indexIFStream.open(videostate->index_filename, std::ifstream::in);
 //
@@ -1885,26 +1892,27 @@ void openIndexFile(VideoState *videostate) {
 //   ifs.open(videostate->index_filename);
 
     videostate->indexIFStream = new ifstream(videostate->index_filename);
-    if(videostate->indexIFStream){
-        videostate->skippingMode = true;
+    if (videostate->indexIFStream) {
+        // read src timebase.
+        std::string line;
+        if (getline(*videostate->indexIFStream, line)) {
+            std::istringstream buf(line);
+            std::istream_iterator<std::string> beg(buf), end;
+            std::vector<std::string> tokens(beg, end); // done!
+            videostate->indexFileTimebase = AVRational{std::stoi(tokens[0]), std::stoi(tokens[1])};
+            videostate->skippingMode = true;
+        }
     }
-
-//    std::string line;
-//    while (getline(reader, line)) {
-//        VideoFrame vf;
-//        vf.loadString(line);
-//        videostate->skipped_frames.push_back(vf);
-//        videostate->skippingMode = true;
-//    }
+    return true;
 }
 
-bool readNextIndex(VideoState* videoState, int64_t& pts, int& parentOfSkippedFrame){
-    if(!videoState->indexIFStream){
+bool readNextIndex(VideoState *videoState, int64_t &pts, int &parentOfSkippedFrame) {
+    if (!videoState->indexIFStream) {
         return false;
     }
     std::string line;
 
-    if(getline(*videoState->indexIFStream, line)){
+    if (getline(*videoState->indexIFStream, line)) {
         std::istringstream buf(line);
         std::istream_iterator<std::string> beg(buf), end;
         std::vector<std::string> tokens(beg, end); // done!

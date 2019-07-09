@@ -14,3 +14,4 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS}  src/libs/cppflow/include )
 target_link_libraries(video_skipping PRIVATE -lavcodec -lavformat -lavutil -lswscale  Threads::Threads
         -ltensorflow ${OpenCV_LIBS})
+

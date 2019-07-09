@@ -32,6 +32,7 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
     this->delta_pts = -1;
     this->skipped_count = 0;
     this->skip_frames = false;
+    this->totalFrames = 0;
 
     // Create videoSkipping.
 
@@ -50,6 +51,8 @@ VideoContext::VideoContext(std::string &input_filename, std::string &output_file
 
     // Open index file.
     this->indexOFStream.open(this->output_filename + ".index");
+    //write indexfile header
+    this->writeIndexFIleHeader();
 }
 
 void VideoContext::saveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
@@ -76,18 +79,18 @@ void VideoContext::saveFrame(AVFrame *pFrame, int width, int height, int iFrame)
 
 
 int VideoContext::openInputFile() {
+
     this->ifmt_ctx = nullptr;
+
     if ((avformat_open_input(&this->ifmt_ctx, this->input_filename.c_str(), nullptr, nullptr)) < 0) {
 
-        fprintf(stderr, "Could not open input file '%s'", this->input_filename.c_str());
+        fprintf(stderr, "Could not open input file '%s'\n", this->input_filename.c_str());
         return -1;
     }
-
     if ((avformat_find_stream_info(ifmt_ctx, nullptr)) < 0) {
         fprintf(stderr, "Failed to retrieve input stream information");
         return -1;
     }
-
     av_dump_format(this->ifmt_ctx, 0, this->input_filename.c_str(), 0);
     return 0;
 }
@@ -465,11 +468,10 @@ void *VideoContext::decode() {
                                 av_frame_unref(f);
                                 av_frame_free(&f);
                             }};
-
                     if (!this->receiveFrameFromDecoder(frame_decoded.get()))
                         break;
-                    frames_decoded++;
 
+                    frames_decoded++;
 
                     if (!frame_queue_->push(move(frame_decoded))) {
                         break;
@@ -513,9 +515,6 @@ void VideoContext::processFrames() {
                     break_loop = true;
                     break;
                 }
-                if(frame->interpolated_frame != nullptr)
-                    printf("found interpolated\n");
-
 
                 // Set opaque to null.
                 frame->opaque = nullptr;
@@ -558,10 +557,6 @@ void VideoContext::processFrames() {
                     int repeat_pict = ready_frames[1]->repeat_pict;
 
 
-                    skipped_frame.push_back(
-                            new VideoFrame(coded_picture_number, pts, duration, repeat_pict)
-                    );
-
                     // Setting next_pts to parent's pts and copy child pts to parent and
                     this->next_pts = ready_frames[2]->pts;
                     this->delta_pts = this->next_pts - ready_frames[1]->pts;
@@ -582,15 +577,16 @@ void VideoContext::processFrames() {
 
             bool break_outer_loop = false;
             for (auto &ready_frame : ready_frames) {
-                int isParentOfSkippedFrame = 0;
+                std::cout << "total frames " << this->totalFrames++ <<  std::endl;
+                int isParentOfSkippedFrame = 1;
                 //Write ready_frame info (pkt dts which is same as pkt_pts).
-                if(ready_frame->opaque != nullptr){
-                    isParentOfSkippedFrame = 1;
+                if (ready_frame->opaque != nullptr) {
+//                    isParentOfSkippedFrame = 1;
                     // Write child .
                     this->writeIndex(std::to_string(ready_frame->pkt_duration) + " " + std::to_string(0));
                 }
                 // Write non-skipped.
-                this->writeIndex(std::to_string(ready_frame->pkt_dts) + " " + std::to_string(isParentOfSkippedFrame));
+                this->writeIndex(std::to_string(ready_frame->pkt_dts) + " " + std::to_string(1));
 
 
                 if (!this->processed_frame_queue_->push(move(ready_frame))) {
@@ -663,8 +659,6 @@ void VideoContext::encode() {
             }
             if (!flushed)
                 break;
-
-
         }
 
 
@@ -701,6 +695,14 @@ void VideoContext::writeReport() {
 void VideoContext::writeIndex(std::string str) {
 
     this->indexOFStream << str << std::endl;
+}
+
+void VideoContext::writeIndexFIleHeader() {
+    this->indexOFStream << std::to_string(this->ifmt_ctx->streams[this->video_stream_indx]->time_base.num)
+                        << " "
+                        << std::to_string(this->ifmt_ctx->streams[this->video_stream_indx]->time_base.den)
+                        << std::endl;
+
 }
 
 VideoContext::~VideoContext() {

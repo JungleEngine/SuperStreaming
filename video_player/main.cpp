@@ -1,7 +1,7 @@
 #include "player.h"
 
 
-int main()
+int main(int argc, char *argv[])
 {
 
     avformat_network_init();
@@ -27,15 +27,14 @@ int main()
     // copy the file name input by the user to the VideoState structure
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
-
-//    "rtsp://127.0.1.1:8554/baz3.mkv";
-//    "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz3.mkv"
-
-
-    videoState->filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/dawood_test.mkv";
-    videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/dawood_test.mkv.index";
+    if(argc<3){
+        videoState->filename = "rtsp://127.0.1.1:8554/animation_skipped.mkv";
+        videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/animation_skipped.mkv.index";
+    }else {
+        videoState->filename = argv[1];//"rtsp://127.0.1.1:8554/baz.mkv";
+        videoState->index_filename = argv[2];
+    }
     openIndexFile(videoState);
-
     // parse max frames to decode input by the user
     char * pEnd;
 

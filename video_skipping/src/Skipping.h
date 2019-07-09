@@ -131,7 +131,6 @@ public:
     bool shouldSkip(AVFrame* firstFrame, AVFrame* secondFrame, AVFrame* thirdFrame){
         // First increment total_checked.
         this->total_checked++;
-
         // Check if should skip..
         cv::Mat firstFrameMat, secondFrameMat, thirdFrameMat;
 
@@ -159,6 +158,7 @@ public:
             return true;
 
         }else{
+            return false;
             // Check model.
             double output = this->runModel(interpolated, groundTruth);
             if(output <= 0.5){
@@ -196,6 +196,7 @@ public:
         printf("Total checked:%d\nTotal skipped:%d\nSkipped by MSE:%d\nSkipped by Intelligent Model%d\n",
         this->total_checked, this->total_skipped, this->total_skipped_MSE, this->total_skipped_model_decision);
     }
+
 };
 
 
