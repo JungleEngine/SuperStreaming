@@ -42,5 +42,6 @@ Qt5-debug-build/
 */*.qmlc
 */testProgs/*
 *.qmlc
+ffmpeg_examples/live555_server/live/liveMedia/
 
 
