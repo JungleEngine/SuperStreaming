@@ -20,6 +20,7 @@ cmake-build-*/
 *.ali
 *.mkv
 *.mp4
+
 *.txt
 *.index
 *.mp4
@@ -30,5 +31,16 @@ benchmark/skipping/images/
 *.jpeg
 *.jpg
 *backup*.zip
+
+*.qmlc
+build-Xtream-Desktop_Qt_5_9_6_GCC_64bit-Debug/
+build-Xtream-Desktop*
+*.stash
+Qt5-debug-build/
+*.gcda
+*.gcno
+*/*.qmlc
+*/testProgs/*
+*.qmlc
 
 
