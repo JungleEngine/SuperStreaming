@@ -3,7 +3,7 @@ TEMPLATE = app
 QT += qml quick
 SOURCES += main.cpp \
     player.cpp \
-    transcoding.cpp
+
 
 
 QMAKE_CXXFLAGS += -fprofile-arcs -ftest-coverage
@@ -18,14 +18,13 @@ LIBS += \
         -L/usr/local/lib -lgcov
 
 
+
 INCLUDEPATH += \
             SDL2/SDL.h SDL2/SDL_thread.h \
             libavcodec/avcodec.h  \
             libavformat/avformat.h \
             libavutil/avutil.h libavutil/timestamp.h libavutil/opt.h \
-            libavresample/avresample.h \
-            libswscale/swscale.h \
-            libswresample/swresample.h
+
 
 
 target.path = /opt/Xtream

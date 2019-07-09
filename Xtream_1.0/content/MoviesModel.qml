@@ -5,9 +5,11 @@ ListModel {
     id: movieModel
 
     ListElement {
-        link: "rtsp://127.0.0.1:8554/The.Lord.of.the.Rings.The.Return.of.the.King.mkv"
-        src : "The.Lord.of.the.Rings.The.Return.of.the.King.mkv"
+        link: "rtsp://127.0.0.1:8554/dawood_skipped.mkv"
+//        link: "rtsp://192.168.43.180:8554/dawood_skipped.mkv"
+        src : "downloads/dawood_skipped.mkv"
         name: "Lord of the Rings: The Return of the King"
+        indx : "index/Lord of the Rings: The Return of the King.mkv.index"
         image: "15.png"
         year: "2003"
         rating: 8.9
@@ -15,21 +17,14 @@ ListModel {
         cast: "Elijah Wood, Viggo Mortensen, Ian McKellen"
         overview: "While Frodo &amp; Sam continue to approach Mount Doom to destroy the One Ring, unaware of the path Gollum is leading them, the former Fellowship aid Rohan &amp; Gondor in a great battle in the Pelennor Fields, Minas Tirith and the Black Gates as Sauron wages his last war against Middle-Earth."
     }
-    ListElement {
-        link: "rtsp://127.0.0.1:8554/Fight\ Club.mkv"
-        src : "Fight\ Club.mkv"
-        name: "Fight Club"
-        image: "9.png"
-        year: "1999"
-        rating: 8.9
-        director: "David Fincher"
-        cast: "Brad Pitt, Edward Norton, Helena Bonham Carter"
-        overview: "A ticking-time-bomb insomniac and a slippery soap salesman channel primal male aggression into a shocking new form of therapy. Their concept catches on, with underground \"fight clubs\" forming in every town, until an eccentric gets in the way and ignites an out-of-control spiral toward oblivion."
-    }
+
     ListElement {
         link: "rtsp://127.0.0.1:8554/The.Lord.of.the.Rings.The.Fellowship.of.the.Rings.mkv"
         src : "The.Lord.of.the.Rings.The.Fellowship.of.the.Rings.mkv"
         name: "Lord of the Rings: The Fellowship of the Ring"
+
+        indx : "index/Lord of the Rings: The Return of the King.mkv.index"
+
         image: "13.png"
         year: "2001"
         rating: 8.8
@@ -40,6 +35,7 @@ ListModel {
     ListElement {
         link: "rtsp://127.0.0.1:8554/The.Lord.of.the.Rings.The.Two.Towers.mkv"
         src : "The.Lord.of.the.Rings.The.Two.Towers.mkv"
+        indx :"index/The.Lord.of.the.Rings.The.Two.Towers.mkv.index"
         name: "Lord of the Rings: The Two Towers"
         image: "14.png"
         year: "2002"
@@ -49,8 +45,10 @@ ListModel {
         overview: "Sauron's forces increase. His allies grow. The Ringwraiths return in an even more frightening form. Saruman's army of Uruk Hai is ready to launch an assault against Aragorn and the people of Rohan. Yet, the Fellowship is broken and Boromir is dead. For the little hope that is left, Frodo and Sam march on into Mordor, unprotected. A number of new allies join with Aragorn, Gimli, Legolas, Pippin and Merry. And they must defend Rohan and attack Isengard. Yet, while all this is going on, Sauron's troops mass toward the City of Gondor, for the War of the Ring is about to begin."
     }
     ListElement {
-        link: "rtsp://127.0.0.1:8554/baz.mkv"
-        src : "baz.mkv"
+        link: "rtsp://127.0.1.1:8554/baz_skipped.mkv"
+        src : "downloads/baz2_inter.mkv"
+        indx : "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz_skipped.mkv.index"
+
         name: "Gladiator"
         image: "10.png"
         year: "2000"
@@ -83,7 +81,7 @@ ListModel {
     }
     ListElement {
         link: "rtsp://127.0.0.1:8554/The\ Social\ Network.mkv"
-        src : "The\ Social\ Network.mkv"
+        src : "The_Social_Network.mkv"
         name: "The Social Network"
         image: "18.png"
         year: "2010"
@@ -212,6 +210,18 @@ ListModel {
         director: "Jan de Bont"
         cast: "Liam Neeson, Catherine Zeta-Jones, Owen Wilson"
         overview: "A remake of the classic 1963 movie \"The Haunting\" about a team of paranormal experts who look into strange occurrences in an ill-fated house. Through the course of the night some will unravel, some will question, and all will fight for their lives as the house fights back."
+    }
+    ListElement {
+
+        link: "rtsp://127.0.0.1:8554/Fight\ Club.mkv"
+        src : "Fight_Club.mkv"
+        name: "Fight Club"
+        image: "9.png"
+        year: "1999"
+        rating: 8.9
+        director: "David Fincher"
+        cast: "Brad Pitt, Edward Norton, Helena Bonham Carter"
+        overview: "A ticking-time-bomb insomniac and a slippery soap salesman channel primal male aggression into a shocking new form of therapy. Their concept catches on, with underground \"fight clubs\" forming in every town, until an eccentric gets in the way and ignites an out-of-control spiral toward oblivion."
     }
     ListElement {
         link: "rtsp://127.0.0.1:8554/"

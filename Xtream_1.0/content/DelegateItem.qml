@@ -29,6 +29,7 @@ Item {
                 detailsView.director = model.director
                 detailsView.link = model.link
                 detailsView.src = model.src
+                detailsView.indx = model.indx
                 detailsView.cast = model.cast
                 detailsView.rating = model.rating
                 detailsView.overview = model.overview

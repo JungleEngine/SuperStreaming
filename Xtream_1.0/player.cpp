@@ -18,25 +18,43 @@ QObject(parent)
 //}
 
 
-void Player::play(QString txt , bool player_type)
+void Player::play(QString txt, QString indx , bool player_type)
+
 {
 
 
     string filmName = txt.toStdString();
 
-    printf("string = %s\n",filmName);
-    string filmName1  = "/home/dawod/GP/Xtream_1.0/FFmpeg/ffplay "+filmName;
-    printf("string = %s\n",filmName1);
+    string indexName = indx.toStdString();
+    string filmName1 , filmName2;
+
+
+
+     filmName1  = "ffplay "+filmName;
+
+     filmName2  = "../video_player/transcoding "+filmName + " " + indexName;
+
+
+     printf("the path = %s\n",filmName);
+     printf("the path = %s\n",indexName);
+     printf("the path = %s\n",filmName2);
+
+
+
 
 
      if (player_type==1){
          const char * filmNamee = filmName1.c_str();
-         system( filmNamee /*"ffplay rtsp://127.0.0.1:8554/baz.mkv"*/);
+         system( filmNamee);
      }
      else
      {
-         const char * filmNamee = filmName.c_str();
-   transcoding(filmNamee);
+         const char * filmNamee = filmName2.c_str();
+         printf("the path = %s\n",filmNamee);
+         //transcoding(filmNamee);
+         system( filmNamee);
+
+
      }
 
 }

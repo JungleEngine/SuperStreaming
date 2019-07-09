@@ -85,25 +85,25 @@ Item {
             id: settingsContentColumn
             width: parent.width
             y: 8
-            Switch {
-                id : no
-                text: "Play skipped video"
-                checked: settings.no_interpolation
-                onCheckedChanged: {
-                    settings.no_interpolation = checked;
-                    settings.perfect_interpolation = false
-                    perfect.checked = false
-                    settings.runtime_interpolation = false
-                    runtime.checked = false
+//            Switch {
+//                id : no
+//                text: "Play skipped video"
+//                checked: settings.no_interpolation
+//                onCheckedChanged: {
+//                    settings.no_interpolation = checked;
+//                    settings.perfect_interpolation = false
+//                    perfect.checked = false
+//                    settings.runtime_interpolation = false
+//                    runtime.checked = false
 
 
 
-                    print("no_interpolation  : " + settings.no_interpolation);
-                    print("perfect_interpolation  : " + settings.perfect_interpolation);
-                    print("runtime_interpolation  : " + settings.runtime_interpolation);
+//                    print("no_interpolation  : " + settings.no_interpolation);
+//                    print("perfect_interpolation  : " + settings.perfect_interpolation);
+//                    print("runtime_interpolation  : " + settings.runtime_interpolation);
 
-                }
-            }
+//                }
+//            }
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: parent.width - 32
