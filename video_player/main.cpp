@@ -30,11 +30,13 @@ int main(int argc, char *argv[])
     if(argc<3){
         videoState->filename = "rtsp://127.0.1.1:8554/animation_skipped.mkv";
         videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/animation_skipped.mkv.index";
+
     }else {
         videoState->filename = argv[1];//"rtsp://127.0.1.1:8554/baz.mkv";
         videoState->index_filename = argv[2];
     }
     openIndexFile(videoState);
+
     // parse max frames to decode input by the user
     char * pEnd;
 

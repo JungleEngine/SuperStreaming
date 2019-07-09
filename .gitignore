@@ -20,6 +20,7 @@ cmake-build-*/
 *.ali
 *.mkv
 *.mp4
+<<<<<<< HEAD
 
 *.txt
 *.index
@@ -32,6 +33,8 @@ benchmark/skipping/images/
 *.jpg
 *backup*.zip
 
+=======
+>>>>>>> 4a2b00c3aef7a025deb2e612a8f698ca4a667eaa
 *.qmlc
 build-Xtream-Desktop_Qt_5_9_6_GCC_64bit-Debug/
 build-Xtream-Desktop*
@@ -39,9 +42,16 @@ build-Xtream-Desktop*
 Qt5-debug-build/
 *.gcda
 *.gcno
+
 */*.qmlc
 */testProgs/*
 *.qmlc
 ffmpeg_examples/live555_server/live/liveMedia/
+*.pro.user
+*ffmpeg_examples/live555_server/live/*
+*CMakeLists.txt
+Xtream_1.0/Xtream.pro.user
+*.out
+video_skipping/a.out
 
-
+*.qmlc

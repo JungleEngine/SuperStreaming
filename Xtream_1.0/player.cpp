@@ -19,12 +19,8 @@ QObject(parent)
 
 
 void Player::play(QString txt, QString indx , bool player_type)
-
 {
-
-
     string filmName = txt.toStdString();
-
     string indexName = indx.toStdString();
     string filmName1 , filmName2;
 
@@ -39,10 +35,6 @@ void Player::play(QString txt, QString indx , bool player_type)
      printf("the path = %s\n",indexName);
      printf("the path = %s\n",filmName2);
 
-
-
-
-
      if (player_type==1){
          const char * filmNamee = filmName1.c_str();
          system( filmNamee);
@@ -53,8 +45,6 @@ void Player::play(QString txt, QString indx , bool player_type)
          printf("the path = %s\n",filmNamee);
          //transcoding(filmNamee);
          system( filmNamee);
-
-
      }
 
 }

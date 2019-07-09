@@ -5,7 +5,6 @@ SOURCES += main.cpp \
     player.cpp \
 
 
-
 QMAKE_CXXFLAGS += -fprofile-arcs -ftest-coverage
 
 LIBS += \
@@ -16,8 +15,6 @@ LIBS += \
         -L/usr/local/lib -lswscale \
         -L/usr/local/lib -lswresample \
         -L/usr/local/lib -lgcov
-
-
 
 INCLUDEPATH += \
             SDL2/SDL.h SDL2/SDL_thread.h \

@@ -1170,6 +1170,7 @@ int video_thread(void *arg) {
                 frameFinished = 1;
             }
 
+
             // did we get an entire video frame?
             if (frameFinished) {
 

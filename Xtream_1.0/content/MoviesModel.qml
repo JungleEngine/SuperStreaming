@@ -22,9 +22,7 @@ ListModel {
         link: "rtsp://127.0.0.1:8554/The.Lord.of.the.Rings.The.Fellowship.of.the.Rings.mkv"
         src : "The.Lord.of.the.Rings.The.Fellowship.of.the.Rings.mkv"
         name: "Lord of the Rings: The Fellowship of the Ring"
-
         indx : "index/Lord of the Rings: The Return of the King.mkv.index"
-
         image: "13.png"
         year: "2001"
         rating: 8.8
@@ -48,7 +46,6 @@ ListModel {
         link: "rtsp://127.0.1.1:8554/baz_skipped.mkv"
         src : "downloads/baz2_inter.mkv"
         indx : "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/baz_skipped.mkv.index"
-
         name: "Gladiator"
         image: "10.png"
         year: "2000"
@@ -212,7 +209,6 @@ ListModel {
         overview: "A remake of the classic 1963 movie \"The Haunting\" about a team of paranormal experts who look into strange occurrences in an ill-fated house. Through the course of the night some will unravel, some will question, and all will fight for their lives as the house fights back."
     }
     ListElement {
-
         link: "rtsp://127.0.0.1:8554/Fight\ Club.mkv"
         src : "Fight_Club.mkv"
         name: "Fight Club"

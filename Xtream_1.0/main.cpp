@@ -9,7 +9,6 @@ int main(int argc, char* argv[])
     qmlRegisterType<Player>("Player",1,0,"Player");
     QQuickView view;
     view.setResizeMode(QQuickView::SizeRootObjectToView);
-
     view.setSource(QUrl::fromLocalFile( QLatin1String("../Xtream_1.0/Xtream.qml")));
 
     const QString lowerArgument = QString::fromLatin1(argv[1]).toLower();
