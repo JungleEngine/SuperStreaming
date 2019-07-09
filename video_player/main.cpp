@@ -28,13 +28,15 @@ int main(int argc, char *argv[])
 //    "/media/syrix/programms/projects/GP/SuperStreaming/ffmpeg_examples/live555_server/live/mediaServer/GOT.mkv"
 //    "rtsp://127.0.1.1:8554/GOT.mkv"
     if(argc<3){
-        videoState->filename = "rtsp://127.0.1.1:8554/animation_skipped.mkv";
-        videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/animation_skipped.mkv.index";
+        videoState->filename = "rtsp://127.0.1.1:554/animation_cut_skipped.mkv";
+        videoState->index_filename = "/media/syrix/programms/projects/GP/SuperStreaming/video_skipping/animation_cut_skipped.mkv.index";
+//        videoState->index_filename = "/";
 
     }else {
         videoState->filename = argv[1];//"rtsp://127.0.1.1:8554/baz.mkv";
         videoState->index_filename = argv[2];
     }
+    videoState->outOFTime = true;
     openIndexFile(videoState);
 
     // parse max frames to decode input by the user
@@ -51,7 +53,6 @@ int main(int argc, char *argv[])
 
     // start the decoding thread to read data from the AVFormatContext
     videoState->decode_tid = SDL_CreateThread(decode_thread, "Decoding Thread", videoState);
-
     // check the decode thread was correctly started
     if(!videoState->decode_tid)
     {
@@ -74,14 +75,25 @@ int main(int argc, char *argv[])
             printf("SDL_WaitEvent failed: %s.\n", SDL_GetError());
         }
 
+
+        switch(event.key.keysym.sym) {
+            case SDL_QUIT:
+            case SDLK_ESCAPE:
+                printf("ESCAPE_PRESSED\n");
+                return 0;
+            default:break;
+        }
+
         // switch on the retrieved event type
         switch(event.type)
         {
             case FF_QUIT_EVENT:
             case SDL_QUIT:
             {
+                printf("exit\n");
                 videoState->quit = 1;
                 SDL_Quit();
+                return 0;
             }
                 break;
 

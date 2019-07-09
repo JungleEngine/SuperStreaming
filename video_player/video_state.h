@@ -185,6 +185,7 @@ enum {
 
 class VideoState {
 public:
+    bool outOFTime= false;
     int finished_decoding = 0;
     bool skippingMode = false;
     /**

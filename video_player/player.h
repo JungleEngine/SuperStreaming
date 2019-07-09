@@ -1159,7 +1159,6 @@ int video_thread(void *arg) {
         while (ret >= 0) {
             // get decoded output data from decoder
             ret = avcodec_receive_frame(videoState->video_ctx, pFrame);
-
             // check an entire frame was decoded
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 break;
@@ -1167,6 +1166,8 @@ int video_thread(void *arg) {
                 printf("Error while decoding.\n");
                 return -1;
             } else {
+                printf("after trying to read\n");
+
                 frameFinished = 1;
             }
 
@@ -1192,7 +1193,7 @@ int video_thread(void *arg) {
 
                         if(pFrame->interpolated_frame != nullptr)
                         {
-                            if (queue_picture(videoState, pFrame, interpolatedPTSTime) < 0) {
+                            if (queue_picture(videoState, pFrame->interpolated_frame, interpolatedPTSTime) < 0) {
                                 break;
                             }
 
@@ -1457,6 +1458,8 @@ int stream_component_open(VideoState *videoState, int stream_index) {
     return 0;
 }
 
+
+
 /**
  * Opens Audio and Video Streams. If all codecs are retrieved correctly, starts
  * an infinite loop to read AVPackets from the global VideoState AVFormatContext.
@@ -1474,6 +1477,11 @@ int decode_thread(void *arg) {
 
     // file I/O context: demuxers read a media file and split it into chunks of data (packets)
     AVFormatContext *pFormatCtx = NULL;
+
+    pFormatCtx = avformat_alloc_context();
+    pFormatCtx->pb->error;
+
+
     ret = avformat_open_input(&pFormatCtx, videoState->filename.c_str(), NULL, NULL);
     if (ret < 0) {
         printf("Could not open file %s.\n", videoState->filename);
@@ -1534,6 +1542,7 @@ int decode_thread(void *arg) {
         }
     }
 
+
     // return with error in case no audio stream was found
     if (audioStream == -1) {
         printf("Could not find audio stream.\n");
@@ -1549,6 +1558,7 @@ int decode_thread(void *arg) {
         }
     }
 
+
     // check both the audio and video codecs were correctly retrieved
     if (videoState->videoStream < 0 || videoState->audioStream < 0) {
         printf("Could not open codecs: %s.\n", videoState->filename);
@@ -1561,6 +1571,7 @@ int decode_thread(void *arg) {
         if (videoState->finished_decoding) {
             printf("quit\n");
             break;
+
         }
 
         // check audio and video packets queues size
@@ -1571,6 +1582,7 @@ int decode_thread(void *arg) {
 
         // read data from the AVFormatContext by repeatedly calling av_read_frame()
         ret = av_read_frame(videoState->pFormatCtx, packet);
+//        printf("size:%d\n", packet->flags);
         if (ret < 0) {
             if (ret == AVERROR_EOF) {
                 // media EOF reached, quit
@@ -1751,6 +1763,7 @@ static void schedule_refresh(VideoState *videoState, Uint32 delay) {
     }
 }
 
+
 /**
  * Pulls from the VideoPicture queue when we have something, sets our timer for
  * when the next video frame should be shown, calls the video_display() method to
@@ -1920,7 +1933,11 @@ bool readNextIndex(VideoState *videoState, int64_t &pts, int &parentOfSkippedFra
         pts = std::stoi(tokens[0]);
         parentOfSkippedFrame = std::stoi(tokens[1]);
         return true;
+    }else{
+        printf("out\n");
+       _exit(0);
     }
+
     return false;
 
 }
